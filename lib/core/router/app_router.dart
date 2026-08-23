@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/session_controller.dart';
 import '../../features/auth/sign_in_screen.dart';
 import '../../features/auth/sign_up_screen.dart';
+import '../../features/budgets/budget_editor_screen.dart';
+import '../../features/budgets/budgets_screen.dart';
 import '../../features/chat/chat_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/expenses/expenses_screen.dart';
@@ -48,6 +50,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/sign-up',
         builder: (_, _) => const SignUpScreen(),
+      ),
+      // Budget management lives outside the tab shell (full-screen push).
+      // 'new' is create mode; any other segment is a budget id.
+      GoRoute(
+        path: '/budgets',
+        builder: (_, _) => const BudgetsScreen(),
+        routes: [
+          GoRoute(
+            path: ':id',
+            builder: (_, state) =>
+                BudgetEditorScreen(budgetId: state.pathParameters['id']!),
+          ),
+        ],
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, shell) => HomeShell(shell: shell),
