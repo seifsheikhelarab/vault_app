@@ -4,7 +4,9 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../core/network/api_client.dart';
 import 'db/vault_database.dart';
+import 'repositories/budgets_repository.dart';
 import 'repositories/categories_repository.dart';
 import 'repositories/expenses_repository.dart';
 
@@ -37,4 +39,11 @@ final categoriesListProvider =
 
 final expensesRepositoryProvider = FutureProvider<ExpensesRepository>(
   (ref) async => ExpensesRepository(await ref.watch(vaultDatabaseProvider.future)),
+);
+
+final budgetsRepositoryProvider = FutureProvider<BudgetsRepository>(
+  (ref) async => BudgetsRepository(
+    await ref.watch(vaultDatabaseProvider.future),
+    ref.watch(apiClientProvider),
+  ),
 );

@@ -10,13 +10,15 @@ import '../config/api_base_url.dart';
 const String _tokenKey = 'better-auth.session_token';
 const Duration _timeout = Duration(seconds: 15);
 
-/// Failure on an auth route, driven purely by HTTP status code.
-/// Auth endpoints speak Better Auth's own JSON, not the app error envelope,
-/// so the response body carries nothing we can rely on here.
+/// Failure on an API route. Auth endpoints speak Better Auth's own JSON, not
+/// the app error envelope, so `code`/`message` stay null there; non-auth
+/// routes populate them from `{ "error": { code, message } }`.
 class ApiException implements Exception {
-  ApiException(this.statusCode);
+  ApiException(this.statusCode, {this.code, this.message});
 
   final int statusCode;
+  final String? code;
+  final String? message;
 
   @override
   String toString() => 'ApiException($statusCode)';
@@ -81,6 +83,92 @@ class ApiClient {
     final res = await fn(await _headers());
     if (res.statusCode != 200) throw ApiException(res.statusCode);
     _captureCookie(res);
+  }
+
+  /// App-envelope routes: on failure parse `{ "error": { code, message } }`
+  /// so callers can surface the server's message. Returns the decoded body
+  /// (`null` for empty bodies, e.g. `204` deletes).
+  Future<Object?> _sendApp(
+    Future<http.Response> Function(Map<String, String> headers) fn,
+  ) async {
+    final res = await fn(await _headers());
+    if (res.statusCode >= 400) {
+      Map<String, dynamic>? body;
+      try {
+        body = _decodeBody(res);
+      } catch (_) {}
+      final err = body?['error'];
+      throw ApiException(
+        res.statusCode,
+        code: err is Map<String, dynamic> ? err['code'] as String? : null,
+        message:
+            err is Map<String, dynamic> ? err['message'] as String? : null,
+      );
+    }
+    return res.body.isEmpty ? null : jsonDecode(res.body);
+  }
+
+  Future<http.Response> _delete(
+    Uri uri,
+    Map<String, String> headers,
+  ) =>
+      _client.delete(uri, headers: headers).timeout(_timeout);
+
+  Future<http.Response> _patch(
+    Uri uri,
+    Map<String, String> headers, {
+    Object? body,
+  }) =>
+      _client.patch(uri, headers: headers, body: body).timeout(_timeout);
+
+  // ── Budgets (/api/budgets — online-only, hard delete) ─────────────────
+
+  Future<List<Map<String, dynamic>>> listBudgets() async {
+    final body = await _sendApp(
+        (h) => _get(_uri('/api/budgets'), h..remove('Content-Type')));
+    return (body! as List).cast<Map<String, dynamic>>();
+  }
+
+  /// Server mints the budget id; returns the created row.
+  Future<Map<String, dynamic>> createBudget({
+    required String periodType,
+    required int amountMinor,
+    String? categoryId,
+  }) async {
+    final body = await _sendApp((h) => _post(
+          _uri('/api/budgets'),
+          h,
+          body: jsonEncode({
+            'periodType': periodType,
+            'amountMinor': amountMinor,
+            'categoryId': ?categoryId,
+          }),
+        ));
+    return body! as Map<String, dynamic>;
+  }
+
+  /// PATCH with the full row (all fields optional per contract; `categoryId`
+  /// explicitly nullable — null clears to overall).
+  Future<Map<String, dynamic>> updateBudget(
+    String id, {
+    required String periodType,
+    required int amountMinor,
+    String? categoryId,
+  }) async {
+    final body = await _sendApp((h) => _patch(
+          _uri('/api/budgets/$id'),
+          h,
+          body: jsonEncode({
+            'periodType': periodType,
+            'amountMinor': amountMinor,
+            'categoryId': categoryId,
+          }),
+        ));
+    return body! as Map<String, dynamic>;
+  }
+
+  Future<void> deleteBudget(String id) async {
+    await _sendApp((h) => _delete(_uri('/api/budgets/$id'), h));
   }
 
   Future<void> signUpEmail({

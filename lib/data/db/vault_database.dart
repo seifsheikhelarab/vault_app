@@ -33,10 +33,33 @@ class Expenses extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [Categories, Expenses])
+/// Cached budget row. Budgets are ONLINE-ONLY for writes (not part of
+/// /api/sync); this table is a read cache of `/api/budgets` rows. Mirrors
+/// the contract shape minus server-only fields. `periodType` is
+/// `'week' | 'month'`; `categoryId` null = overall budget.
+@DataClassName('BudgetRow')
+class Budgets extends Table {
+  TextColumn get id => text()();
+  TextColumn get periodType => text()();
+  IntColumn get amountMinor => integer()();
+  TextColumn get categoryId => text().nullable().references(Categories, #id)();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DriftDatabase(tables: [Categories, Expenses, Budgets])
 class VaultDatabase extends _$VaultDatabase {
   VaultDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onUpgrade: (m, from, to) async {
+          if (from < 2) await m.createTable(budgets);
+        },
+      );
 }

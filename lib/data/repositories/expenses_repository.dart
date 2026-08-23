@@ -125,4 +125,19 @@ class ExpensesRepository {
     }
     return query.map((row) => row.read(count) ?? 0).watchSingle();
   }
+
+  /// Live spend totals within the half-open window `[start, end)`, grouped
+  /// by categoryId (null key = uncategorized). Feeds budget progress bars;
+  /// overall budgets sum every value in the map.
+  Stream<Map<String?, int>> watchSpendBetween(DateTime start, DateTime end) {
+    final total = _db.expenses.amountMinor.sum();
+    final query = _db.selectOnly(_db.expenses)
+      ..addColumns([_db.expenses.categoryId, total])
+      ..where(_db.expenses.occurredAt.isBiggerOrEqualValue(start) &
+          _db.expenses.occurredAt.isSmallerThanValue(end));
+    return query.watch().map((rows) => {
+          for (final row in rows)
+            row.read(_db.expenses.categoryId): row.read(total) ?? 0,
+        });
+  }
 }

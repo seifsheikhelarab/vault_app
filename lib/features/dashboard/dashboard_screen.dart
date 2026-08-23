@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/money/money.dart';
 import '../../core/ui/empty_state.dart';
@@ -204,6 +205,11 @@ class _DashboardContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
+        TextButton.icon(
+          onPressed: () => context.push('/budgets'),
+          icon: const Icon(Icons.savings_outlined),
+          label: const Text('Manage budgets'),
+        ),
         if (data.recent.isNotEmpty) ...[
           Text(
             'Recent expenses',
