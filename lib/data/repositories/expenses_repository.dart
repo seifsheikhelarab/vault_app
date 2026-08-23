@@ -33,6 +33,28 @@ class ExpensesRepository {
         .getSingle();
   }
 
+  /// Inserts a row the server already holds under [id] (chat confirm flow:
+  /// POST succeeds, then local insert). `pendingSync` stays false so the
+  /// sync engine never re-pushes it.
+  Future<void> createSynced({
+    required String id,
+    required int amountMinor,
+    String? categoryId,
+    required DateTime occurredAt,
+    String? note,
+  }) {
+    return _db.into(_db.expenses).insert(
+          ExpensesCompanion.insert(
+            id: id,
+            amountMinor: amountMinor,
+            categoryId: Value(categoryId),
+            occurredAt: occurredAt,
+            note: Value(note),
+            recurringId: const Value(null),
+          ),
+        );
+  }
+
   /// Newest-first page for purely-local infinite scroll. `limit` grows as
   /// the user scrolls; the stream re-emits on any local mutation.
   Stream<List<ExpenseRow>> watchPage({
