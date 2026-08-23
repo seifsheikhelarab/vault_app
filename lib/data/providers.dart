@@ -4,9 +4,9 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../repositories/categories_repository.dart';
-import '../repositories/expenses_repository.dart';
 import 'db/vault_database.dart';
+import 'repositories/categories_repository.dart';
+import 'repositories/expenses_repository.dart';
 
 /// Opens the on-disk database. Overridden with `NativeDatabase.memory()` in
 /// tests.
@@ -25,6 +25,15 @@ final vaultDatabaseProvider = FutureProvider<VaultDatabase>((ref) async {
 final categoriesRepositoryProvider = FutureProvider<CategoriesRepository>(
   (ref) async => CategoriesRepository(await ref.watch(vaultDatabaseProvider.future)),
 );
+
+/// Live category list for chips and management UI. The stream instance is
+/// owned here so widgets never resubscribe per rebuild.
+final categoriesListProvider =
+    StreamProvider.autoDispose<List<CategoryRow>>((ref) {
+  final repo = ref.watch(categoriesRepositoryProvider).value;
+  if (repo == null) return const Stream<Never>.empty();
+  return repo.watchAll();
+});
 
 final expensesRepositoryProvider = FutureProvider<ExpensesRepository>(
   (ref) async => ExpensesRepository(await ref.watch(vaultDatabaseProvider.future)),
