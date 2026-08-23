@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-23T12:20:00Z",
+  "title": "Design System: Vault",
+  "extensions": {
+    "colorMeta": {
+      "field-teal": {
+        "role": "primary",
+        "displayName": "Field Teal",
+        "canonical": "#0E7C7B",
+        "tonalRamp": ["#052B2A", "#08403F", "#0E7C7B", "#1A9493", "#3FAAA9", "#6FC4C3", "#A5DEDD", "#D5F1F0"]
+      },
+      "ember": {
+        "role": "secondary",
+        "displayName": "Ember",
+        "canonical": "#E8562A",
+        "tonalRamp": ["#3B1204", "#571C08", "#E8562A", "#ED6E45", "#F28A68", "#F6A98F", "#FAC9B6", "#FDE8DE"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Monument", "purpose": "One per viewport: wordmark now, money figures later." },
+      "label": { "displayName": "Nav Label", "purpose": "Navigation destination labels only." }
+    },
+    "shadows": [
+      {
+        "name": "slab-rise",
+        "value": "0px -6px 18px rgba(0,0,0,0.35)",
+        "purpose": "Upward-cast structural shadow where a content slab rises over the committed field."
+      }
+    ],
+    "motion": [],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Full-width filled action; the one primary move per screen.",
+      "html": "<button class=\"ds-btn-primary\">Sign in</button>",
+      "css": ".ds-btn-primary { background: #0E7C7B; color: #FFFFFF; border: none; border-radius: 14px; width: 100%; height: 52px; font: 600 16px Roboto, sans-serif; } .ds-btn-primary:hover { filter: brightness(1.08); } .ds-btn-primary:focus-visible { outline: 2px solid #0E7C7B; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Filled neutral field with quiet stroke; validation speaks plainly.",
+      "html": "<input class=\"ds-input\" placeholder=\"Email\" />",
+      "css": ".ds-input { background: #FAFDFC; color: #191C1C; border: 1px solid #D4E0DF; border-radius: 14px; padding: 14px 16px; font: 400 16px Roboto, sans-serif; width: 100%; } .ds-input:focus { outline: none; border-color: #0E7C7B; }"
+    },
+    {
+      "name": "Capture FAB",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The only ember element in the world: log an expense.",
+      "html": "<button class=\"ds-fab\" aria-label=\"Log an expense\">+</button>",
+      "css": ".ds-fab { background: #E8562A; color: #FFFFFF; border: none; border-radius: 16px; width: 56px; height: 56px; font-size: 24px; box-shadow: 0 3px 6px rgba(0,0,0,0.3); cursor: pointer; } .ds-fab:hover { filter: brightness(1.06); } .ds-fab:focus-visible { outline: 2px solid #E8562A; outline-offset: 2px; }"
+    },
+    {
+      "name": "Empty State",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Honest placeholder: icon, title, what-arrives-and-when message.",
+      "html": "<div class=\"ds-empty\"><div class=\"ds-empty-icon\">▦</div><div class=\"ds-empty-title\">Your month at a glance</div><div class=\"ds-empty-body\">Totals and budgets land here once expenses exist.</div></div>",
+      "css": ".ds-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 32px; } .ds-empty-icon { font-size: 48px; color: #899694; } .ds-empty-title { margin-top: 16px; font: 600 16px Roboto, sans-serif; color: #191C1C; } .ds-empty-body { margin-top: 8px; font: 400 14px Roboto, sans-serif; color: #404947; }"
+    },
+    {
+      "name": "Rising Slab Sheet",
+      "kind": "card",
+      "refersTo": null,
+      "description": "Content surface rising over the committed field with the signature upward shadow.",
+      "html": "<div class=\"ds-slab\"><div class=\"ds-slab-content\">Form lives here</div></div>",
+      "css": ".ds-slab { background: #FAFDFC; border-radius: 28px 28px 0 0; box-shadow: 0 -6px 18px rgba(0,0,0,0.35); padding: 32px 24px 24px; } .ds-slab-content { font: 400 14px Roboto, sans-serif; color: #191C1C; }"
+    },
+    {
+      "name": "Snackbar",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Floating rounded toast for gentle status.",
+      "html": "<div class=\"ds-snackbar\">Expense capture arrives with the expenses release.</div>",
+      "css": ".ds-snackbar { background: #324948; color: #D5F1F0; border-radius: 12px; padding: 14px 16px; font: 400 14px Roboto, sans-serif; max-width: 420px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Wallet Grammar",
+    "overview": "Vault borrows the visual grammar of the mobile-wallet homes Egyptians already navigate daily — InstaPay, Vodafone Cash: a committed colored field owns whole regions of the screen, content arrives on floating off-white slabs, and exactly one hot accent exists, reserved by law for the capture action. Money is the protagonist; chrome stays quiet. Nothing nags, nothing glows.",
+    "keyCharacteristics": [
+      "Two brand constants only: committed teal field, capture-only ember",
+      "All other color flows from Material role derivation (ColorScheme.fromSeed)",
+      "One typographic mass per viewport; type hierarchy does the rest quietly",
+      "Rounded-slab geometry (28px rising sheets, 14px controls, 12px toasts)"
+    ],
+    "rules": [
+      { "name": "The Ember Law", "body": "Ember decorates only the capture action — currently the FAB, forever anything expense-capture becomes. If ember appears somewhere that cannot log an expense, the design is broken.", "section": "colors" },
+      { "name": "The Committed Field Rule", "body": "Whole regions carry the teal field; teal never shrinks to trim, borders, or small highlights. It commits area or abstains.", "section": "colors" },
+      { "name": "The One Mass Rule", "body": "Each viewport holds exactly one dominant typographic mass — the money figure or the wordmark — and every other string yields to it.", "section": "typography" }
+    ],
+    "dos": [
+      "Do derive every color except Field Teal and Ember from ColorScheme.fromSeed(fieldTeal) so dark theme adapts for free.",
+      "Do give each viewport exactly one monumental typographic mass.",
+      "Do write placeholders that name what arrives and when.",
+      "Do reserve 52px full-width filled buttons for a screen's single primary action."
+    ],
+    "donts": [
+      "Don't use Ember anywhere that can't capture an expense — especially auth.",
+      "Don't hardcode neutrals; use scheme roles so dark mode stays coherent.",
+      "Don't shrink the teal into borders, badges, or trims — it commits regions or abstains.",
+      "Don't fake data states with skeletons or shimmers; say what's coming instead."
+    ]
+  }
+}
