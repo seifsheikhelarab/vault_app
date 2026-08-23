@@ -48,7 +48,7 @@ void main() {
     expect(find.text('Your month at a glance'), findsOneWidget);
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byType(FloatingActionButton), findsOneWidget);
-    for (final label in ['Home', 'Expenses', 'Chat', 'Settings']) {
+    for (final label in ['Dashboard', 'Expenses', 'Chat', 'Settings']) {
       expect(navLabel(label), findsOneWidget);
     }
   });

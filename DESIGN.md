@@ -118,7 +118,7 @@ Rounded but disciplined. Controls (buttons, inputs) share a 14px radius; toasts 
 - **Active behavior:** re-tapping the current tab returns to its root location
 
 ### Capture FAB
-- **Signature component.** Ember (#E8562A) ground, white add glyph, tooltip "Log an expense". The only hot element in the world; sits above the NavigationBar on every main tab.
+- **Signature component.** Ember (#E8562A) ground, white add glyph, tooltip "Log an expense". The only hot element in the world; sits above the NavigationBar on every main tab. Exception to the no-hardcoded-neutrals rule: the glyph is literal `Colors.white` by design — Ember has no scheme role to derive an `on` color from, so white is the law here, not an oversight.
 
 ### Empty State
 - Centered column: 48px outline-colored icon, w600 titleMedium headline, bodyMedium explanation in `onSurfaceVariant`. Copy names what arrives and when ("Parsing ships soon"), never fakes loading.
