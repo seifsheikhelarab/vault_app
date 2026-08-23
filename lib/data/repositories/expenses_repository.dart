@@ -53,6 +53,69 @@ class ExpensesRepository {
         .watch();
   }
 
+  /// Newest-first page joined with category names (`null` when uncategorized
+  /// or the category was deleted). Feeds the dashboard recent list.
+  Stream<List<(ExpenseRow, String?)>> watchRecentWithCategory({
+    required int limit,
+  }) {
+    final query = _db.select(_db.expenses).join([
+      leftOuterJoin(
+          _db.categories, _db.categories.id.equalsExp(_db.expenses.categoryId)),
+    ]);
+    return (query
+              ..orderBy([
+                OrderingTerm(
+                    expression: _db.expenses.occurredAt,
+                    mode: OrderingMode.desc),
+                OrderingTerm(
+                    expression: _db.expenses.createdAt,
+                    mode: OrderingMode.desc),
+                OrderingTerm(
+                    expression: _db.expenses.id, mode: OrderingMode.desc),
+              ])
+              ..limit(limit))
+        .watch()
+        .map(
+          (rows) => rows
+              .map((row) => (
+                    row.readTable(_db.expenses),
+                    row.readTableOrNull(_db.categories)?.name,
+                  ))
+              .toList(),
+        );
+  }
+
+  /// Live expense sums (piasters) over two adjacent half-open windows:
+  /// `[prevStart, windowStart)` and `[windowStart, windowEnd)`. One reactive
+  /// row keeps both figures consistent with each other.
+  Stream<({int previous, int current})> watchWindowTotals({
+    required DateTime prevStart,
+    required DateTime windowStart,
+    required DateTime windowEnd,
+  }) {
+    final query = _db.customSelect(
+      'SELECT '
+      'COALESCE(SUM(CASE WHEN occurred_at >= ? AND occurred_at < ? '
+      'THEN amount_minor END), 0) AS cur, '
+      'COALESCE(SUM(CASE WHEN occurred_at >= ? AND occurred_at < ? '
+      'THEN amount_minor END), 0) AS prev '
+      'FROM expenses',
+      variables: [
+        Variable.withDateTime(windowStart),
+        Variable.withDateTime(windowEnd),
+        Variable.withDateTime(prevStart),
+        Variable.withDateTime(windowStart),
+      ],
+      readsFrom: {_db.expenses},
+    );
+    return query.watchSingle().map(
+          (row) => (
+            previous: row.read<int>('prev'),
+            current: row.read<int>('cur'),
+          ),
+        );
+  }
+
   /// Count of live rows, used to stop infinite scroll growth.
   Stream<int> watchCount({String? categoryId}) {
     final count = _db.expenses.id.count();

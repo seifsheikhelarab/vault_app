@@ -8,6 +8,7 @@ import '../../features/auth/sign_up_screen.dart';
 import '../../features/chat/chat_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/expenses/expenses_screen.dart';
+import '../../features/reports/reports_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/shell/home_shell.dart';
 
@@ -35,6 +36,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/sign-up',
         builder: (_, _) => const SignUpScreen(),
+      ),
+      GoRoute(
+        path: '/reports',
+        builder: (_, _) => const ReportsScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, shell) => HomeShell(shell: shell),
