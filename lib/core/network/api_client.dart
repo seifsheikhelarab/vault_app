@@ -14,12 +14,44 @@ const Duration _timeout = Duration(seconds: 15);
 /// Auth endpoints speak Better Auth's own JSON, not the app error envelope,
 /// so the response body carries nothing we can rely on here.
 class ApiException implements Exception {
-  ApiException(this.statusCode);
+  ApiException(this.statusCode, [this.message]);
 
   final int statusCode;
 
+  /// `error.message` from the app error envelope on non-auth routes;
+  /// `null` for auth routes (Better Auth bodies) and empty payloads.
+  final String? message;
+
   @override
   String toString() => 'ApiException($statusCode)';
+}
+
+/// Expense DRAFT returned by `/api/chat/parse`. The server saves nothing;
+/// the client turns it into a real expense via its own POST.
+class ParsedDraft {
+  ParsedDraft({
+    required this.amountMinor,
+    required this.categoryGuess,
+    required this.categoryId,
+    required this.occurredAtGuess,
+    required this.note,
+  });
+
+  final int amountMinor;
+  final String? categoryGuess;
+  final String? categoryId;
+
+  /// Bare date (`YYYY-MM-DD`) resolved in the user's timezone.
+  final String occurredAtGuess;
+  final String? note;
+
+  factory ParsedDraft.fromJson(Map<String, dynamic> json) => ParsedDraft(
+        amountMinor: (json['amountMinor'] as num).toInt(),
+        categoryGuess: json['categoryGuess'] as String?,
+        categoryId: json['categoryId'] as String?,
+        occurredAtGuess: json['occurredAtGuess'] as String,
+        note: json['note'] as String?,
+      );
 }
 
 /// Thin client for the Vault API. Owns the cookie jar: persists
@@ -64,6 +96,11 @@ class ApiClient {
     if (res.body.isEmpty) return null;
     return jsonDecode(res.body) as Map<String, dynamic>?;
   }
+
+  String? _envelopeMessage(Map<String, dynamic>? body) =>
+      body?['error'] is Map<String, dynamic>
+          ? (body!['error'] as Map<String, dynamic>)['message'] as String?
+          : null;
 
   Future<http.Response> _get(Uri uri, Map<String, String> headers) =>
       _client.get(uri, headers: headers).timeout(_timeout);
@@ -125,6 +162,47 @@ class ApiClient {
     if (res.statusCode == 401) return null;
     if (res.statusCode != 200) throw ApiException(res.statusCode);
     return _decodeBody(res);
+  }
+
+  /// `POST /api/chat/parse` — natural-language phrase in, one expense draft
+  /// out. Nothing is persisted server-side. Errors: 502 parser failed,
+  /// 422 validation, 429 rate limited (shares the auth bucket).
+  Future<ParsedDraft> parseExpense(String message) async {
+    final res = await _post(
+      _uri('/api/chat/parse'),
+      await _headers(),
+      body: jsonEncode({'message': message}),
+    );
+    final body = _decodeBody(res);
+    if (res.statusCode != 200) {
+      throw ApiException(res.statusCode, _envelopeMessage(body));
+    }
+    return ParsedDraft.fromJson(body!);
+  }
+
+  /// `POST /api/expenses` — [id] MUST be a client-minted UUID so retries
+  /// dedupe (same id + same payload replays idempotently as `200`).
+  Future<void> createExpense({
+    required String id,
+    required int amountMinor,
+    DateTime? occurredAt,
+    String? categoryId,
+    String? note,
+  }) async {
+    final res = await _post(
+      _uri('/api/expenses'),
+      await _headers(),
+      body: jsonEncode({
+        'id': id,
+        'amountMinor': amountMinor,
+        if (occurredAt != null) 'occurredAt': occurredAt.toUtc().toIso8601String(),
+        'categoryId': ?categoryId,
+        'note': ?note,
+      }),
+    );
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      throw ApiException(res.statusCode, _envelopeMessage(_decodeBody(res)));
+    }
   }
 }
 
