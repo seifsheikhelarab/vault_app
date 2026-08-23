@@ -20,11 +20,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: '/sign-in',
     refreshListenable: refresh,
     redirect: (context, state) {
-      final signedIn = ref.read(sessionProvider);
-      final onAuth = state.matchedLocation == '/sign-in' ||
-          state.matchedLocation == '/sign-up';
-      if (!signedIn && !onAuth) return '/sign-in';
-      if (signedIn && onAuth) return '/home';
+      final session = ref.read(sessionProvider);
+      // Boot still deciding (stored cookie being validated): hold course so a
+      // cold-start deep link is not rewritten before the gate knows the answer.
+      if (session.isLoading) return null;
+
+      final loc = state.matchedLocation;
+      final onAuth = loc == '/sign-in' || loc == '/sign-up';
+      final authed = session.value ?? false;
+
+      if (!authed) {
+        if (onAuth) return null;
+        // Carry the original destination; restored after sign-in.
+        return '/sign-in?from=${Uri.encodeQueryComponent(state.uri.toString())}';
+      }
+      if (onAuth) {
+        final from = state.uri.queryParameters['from'];
+        return (from != null && from.startsWith('/')) ? from : '/home';
+      }
       return null;
     },
     routes: [
