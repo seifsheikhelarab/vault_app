@@ -107,14 +107,16 @@ class ApiClient {
   }
 
   /// Capture the session cookie from an auth response into secure storage.
-  void _captureCookie(http.Response res) {
+  /// Awaited by [_send] so a rotated token (e.g. after change-password) is
+  /// durably persisted before the caller can fire another request.
+  Future<void> _captureCookie(http.Response res) async {
     final raw = res.headers['set-cookie'];
     if (raw == null) return;
     final match =
         RegExp('${RegExp.escape(_tokenKey)}=([^;]+)').firstMatch(raw);
     final value = match?.group(1);
     if (value != null && value.isNotEmpty) {
-      _storage.write(key: _tokenKey, value: value);
+      await _storage.write(key: _tokenKey, value: value);
     }
   }
 
@@ -144,7 +146,7 @@ class ApiClient {
   ) async {
     final res = await fn(await _headers());
     if (res.statusCode != 200) throw ApiException(res.statusCode);
-    _captureCookie(res);
+    await _captureCookie(res);
   }
 
   /// App-envelope routes: on failure parse `{ "error": { code, message } }`
@@ -265,6 +267,25 @@ class ApiClient {
 
   Future<void> signOut() {
     return _send((h) => _post(_uri('/api/auth/sign-out'), h));
+  }
+
+  /// `POST /api/auth/change-password` — rotates the session cookie. The
+  /// rotated token is captured into secure storage (awaited) before this
+  /// returns, so every later request already carries the fresh session.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    bool revokeOtherSessions = false,
+  }) {
+    return _send((h) => _post(
+          _uri('/api/auth/change-password'),
+          h,
+          body: jsonEncode({
+            'currentPassword': currentPassword,
+            'newPassword': newPassword,
+            'revokeOtherSessions': revokeOtherSessions,
+          }),
+        ));
   }
 
   /// Parsed `{session, user}` JSON, or `null` when unauthenticated
