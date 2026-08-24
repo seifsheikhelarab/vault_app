@@ -25,16 +25,24 @@ void _validateName(String raw) {
   }
 }
 
-/// Categories are fully offline-writable; deleting one nulls the
-/// `categoryId` of referencing expenses so history survives taxonomy
-/// changes (mirrors server hard-delete semantics).
+/// Categories are fully offline-writable. Writes stage as dirty rows
+/// (`pendingSync`) for the sync engine; deleting one nulls the `categoryId`
+/// of referencing expenses immediately and stages a tombstone row — the
+/// local row disappears only after the server accepts the delete push
+/// (categories hard-delete server-side, so there is no pull tombstone).
 class CategoriesRepository {
   CategoriesRepository(this._db);
 
   final VaultDatabase _db;
 
+  /// Fired after any local write so the sync engine can schedule a debounced
+  /// cycle. Wired by `syncSchedulerProvider`; nullable to keep plain-DB tests
+  /// friction-free.
+  void Function()? onMutated;
+
   Stream<List<CategoryRow>> watchAll() {
     return (_db.select(_db.categories)
+          ..where((c) => c.deletedAt.isNull())
           ..orderBy([
             (c) => OrderingTerm(expression: c.name.lower()),
           ]))
@@ -47,9 +55,16 @@ class CategoriesRepository {
     await _guardDuplicate(name);
     final id = const Uuid().v4();
     await _db.into(_db.categories).insert(
-          CategoriesCompanion.insert(id: id, name: name),
+          CategoriesCompanion.insert(
+            id: id,
+            name: name,
+            updatedAt: Value(DateTime.now()),
+            pendingSync: const Value(true),
+          ),
         );
-    return CategoryRow(id: id, name: name);
+    onMutated?.call();
+    return (_db.select(_db.categories)..where((c) => c.id.equals(id)))
+        .getSingle();
   }
 
   Future<void> rename(String id, String rawName) async {
@@ -57,21 +72,50 @@ class CategoriesRepository {
     _validateName(name);
     await _guardDuplicate(name, excludingId: id);
     await (_db.update(_db.categories)..where((c) => c.id.equals(id)))
-        .write(CategoriesCompanion(name: Value(name)));
+        .write(CategoriesCompanion(
+      name: Value(name),
+      updatedAt: Value(DateTime.now()),
+      pendingSync: const Value(true),
+    ));
+    onMutated?.call();
   }
 
-  Future<void> delete(String id) {
-    return _db.transaction(() async {
-      // Keep referencing expenses intact with their category reference cleared.
+  /// Stages the deletion: the category vanishes from live queries and its
+  /// references are nulled now; the row itself lingers as a tombstone until
+  /// [purge] removes it after the server accepts the pushed delete.
+  Future<void> delete(String id) async {
+    await _db.transaction(() async {
+      // Keep referencing rows intact with their category reference cleared.
       await (_db.update(_db.expenses)..where((e) => e.categoryId.equals(id)))
           .write(const ExpensesCompanion(categoryId: Value(null)));
+      await (_db.update(_db.budgets)..where((b) => b.categoryId.equals(id)))
+          .write(const BudgetsCompanion(categoryId: Value(null)));
+      await (_db.update(_db.categories)..where((c) => c.id.equals(id)))
+          .write(CategoriesCompanion(
+        deletedAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+        pendingSync: const Value(true),
+      ));
+    });
+    onMutated?.call();
+  }
+
+  /// Removes a tombstone whose push the server accepted, plus any
+  /// referencing rows still pointing at it (idempotent).
+  Future<void> purge(String id) {
+    return _db.transaction(() async {
+      await (_db.update(_db.expenses)..where((e) => e.categoryId.equals(id)))
+          .write(const ExpensesCompanion(categoryId: Value(null)));
+      await (_db.update(_db.budgets)..where((b) => b.categoryId.equals(id)))
+          .write(const BudgetsCompanion(categoryId: Value(null)));
       await (_db.delete(_db.categories)..where((c) => c.id.equals(id))).go();
     });
   }
 
   Future<void> _guardDuplicate(String name, {String? excludingId}) async {
     final query = _db.select(_db.categories)
-      ..where((c) => c.name.lower().equals(name.toLowerCase()));
+      ..where((c) => c.deletedAt.isNull() &
+          c.name.lower().equals(name.toLowerCase()));
     final existing = await query.get();
     final clash = existing.any((row) => row.id != excludingId);
     if (clash) throw DuplicateCategoryException(name);

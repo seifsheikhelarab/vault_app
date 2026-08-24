@@ -4,10 +4,19 @@ part 'vault_database.g.dart';
 
 /// Local category taxonomy. Mirrors `/api/categories` rows minus server-only
 /// fields; `id` is a client-minted UUID so offline creates sync cleanly.
+///
+/// Sync fields: `updatedAt` feeds last-write-wins pushes; `pendingSync`
+/// marks rows the sync engine still owes the server; `deletedAt` stages a
+/// delete until the server accepts the tombstone (categories hard-delete
+/// there, so the local row is removed only after an accepted push).
 @DataClassName('CategoryRow')
 class Categories extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  BoolColumn get pendingSync =>
+      boolean().named('pending_sync').withDefault(const Constant(false))();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -16,6 +25,10 @@ class Categories extends Table {
 /// Local expense ledger. `amountMinor` is integer piasters. `pendingSync`
 /// marks rows the sync engine still owes the server. `recurringId` is
 /// reserved for the recurring-source badge.
+///
+/// `updatedAt`/`deletedAt` mirror the `/api/sync/push` whole-row LWW
+/// payload: edits bump `updatedAt`, deletions stage a `deletedAt` tombstone
+/// that is pushed, then the row is removed once the server accepts.
 @DataClassName('ExpenseRow')
 class Expenses extends Table {
   TextColumn get id => text()();
@@ -28,6 +41,8 @@ class Expenses extends Table {
   TextColumn get recurringId => text().nullable()();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -49,17 +64,36 @@ class Budgets extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [Categories, Expenses, Budgets])
+/// Key-value store for sync engine state. One row (`key = 'pull'`) holds
+/// the incremental pull cursor so it survives process restarts.
+@DataClassName('SyncStateRow')
+class SyncState extends Table {
+  TextColumn get key => text()();
+  TextColumn get cursor => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {key};
+}
+
+@DriftDatabase(tables: [Categories, Expenses, Budgets, SyncState])
 class VaultDatabase extends _$VaultDatabase {
   VaultDatabase(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
           if (from < 2) await m.createTable(budgets);
+          if (from < 3) {
+            await m.createTable(syncState);
+            // NOT NULL additions carry defaults so existing rows backfill.
+            await m.addColumn(categories, categories.updatedAt);
+            await m.addColumn(categories, categories.pendingSync);
+            await m.addColumn(categories, categories.deletedAt);
+            await m.addColumn(expenses, expenses.updatedAt);
+          }
         },
       );
 }
