@@ -12,7 +12,16 @@ class _FakeStorage extends FlutterSecureStorage {
   final Map<String, String> values = {};
 
   @override
-  Future<String?> read({required String key}) async => values[key];
+  Future<String?> read({
+    required String key,
+    AndroidOptions? aOptions,
+    AppleOptions? iOptions,
+    LinuxOptions? lOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+    WebOptions? webOptions,
+  }) async =>
+      values[key];
 
   @override
   Future<void> write({
@@ -33,7 +42,15 @@ class _FakeStorage extends FlutterSecureStorage {
   }
 
   @override
-  Future<void> delete({required String key}) async {
+  Future<void> delete({
+    required String key,
+    AndroidOptions? aOptions,
+    AppleOptions? iOptions,
+    LinuxOptions? lOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+    WebOptions? webOptions,
+  }) async {
     values.remove(key);
   }
 }
@@ -43,7 +60,8 @@ void main() {
   const oldToken = 'old-token';
   const newToken = 'rotated-token';
 
-  Future<ApiClient> clientFor(http.Handler handler) async {
+  Future<ApiClient> clientFor(
+      Future<http.Response> Function(http.Request) handler) async {
     final storage = _FakeStorage();
     storage.values[tokenKey] = oldToken;
     return ApiClient(
