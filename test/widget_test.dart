@@ -81,10 +81,13 @@ Future<http.Response> _route(http.Request request) async {
   return http.Response('{"error":{"code":"not_found"}}', 404);
 }
 
+/// Database opened by the most recent [pumpApp]; closed by [unmount] so no
+/// two VaultDatabase instances are ever alive at once (drift warns otherwise).
+VaultDatabase? _db;
+
 Widget appUnderTest() => ProviderScope(
       overrides: [
-        vaultDatabaseProvider.overrideWithValue(
-            AsyncValue.data(VaultDatabase(NativeDatabase.memory()))),
+        vaultDatabaseProvider.overrideWithValue(AsyncValue.data(_db!)),
         apiClientProvider.overrideWithValue(
           ApiClient(client: MockClient(_route), storage: _FakeStorage()),
         ),
@@ -100,9 +103,12 @@ Widget appUnderTest() => ProviderScope(
 Future<void> unmount(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
   await tester.pump(const Duration(milliseconds: 1));
+  await _db?.close();
+  _db = null;
 }
 
 Future<void> pumpApp(WidgetTester tester) async {
+  _db = VaultDatabase(NativeDatabase.memory());
   await tester.pumpWidget(appUnderTest());
   await tester.pumpAndSettle();
 }
