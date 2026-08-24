@@ -55,6 +55,32 @@ class ParsedDraft {
       );
 }
 
+/// One page of the incremental `/api/sync/pull` delta. Both tables share a
+/// watermark; tombstoned expenses are included, categories never are.
+class SyncPullPage {
+  SyncPullPage({
+    required this.expenses,
+    required this.categories,
+    required this.nextCursor,
+  });
+
+  final List<Map<String, dynamic>> expenses;
+  final List<Map<String, dynamic>> categories;
+
+  /// `null` means the delta is fully drained.
+  final String? nextCursor;
+}
+
+/// Per-item outcome of `/api/sync/push`. `conflict-lost` still means the
+/// server holds the authoritative row (equal timestamps favor server), so
+/// callers treat it like `accepted`.
+class SyncPushResult {
+  SyncPushResult(this.id, this.outcome);
+
+  final String id;
+  final String outcome;
+}
+
 /// Thin client for the Vault API. Owns the cookie jar: persists
 /// `better-auth.session_token` in secure storage and replays it verbatim as
 /// the `Cookie:` header on every request (the server has no bearer support).
@@ -290,6 +316,58 @@ class ApiClient {
     if (res.statusCode != 200 && res.statusCode != 201) {
       throw ApiException(res.statusCode, message: _envelopeMessage(_decodeBody(res)));
     }
+  }
+
+  // ── Sync (/api/sync — expenses + categories only) ──────────────────────
+
+  /// Drains one page of the incremental delta. First-ever sync omits
+  /// [cursor]; loop until `nextCursor` is null.
+  Future<SyncPullPage> pullSync({required int limit, String? cursor}) async {
+    final body = await _sendApp((h) => _get(
+          _uri('/api/sync/pull?limit=$limit${cursor == null ? '' : '&cursor=$cursor'}'),
+          h..remove('Content-Type'),
+        ));
+    final json = body! as Map<String, dynamic>;
+    return SyncPullPage(
+      expenses: (json['expenses'] as List).cast<Map<String, dynamic>>(),
+      categories: (json['categories'] as List).cast<Map<String, dynamic>>(),
+      nextCursor: json['nextCursor'] as String?,
+    );
+  }
+
+  /// Uploads whole-row LWW payloads (≤500 per array; both optional). Batch
+  /// is atomic and categories apply before expenses, so same-batch
+  /// references are safe.
+  Future<List<SyncPushResult>> pushSync({
+    List<Map<String, dynamic>> categories = const [],
+    List<Map<String, dynamic>> expenses = const [],
+  }) async {
+    if (categories.isEmpty && expenses.isEmpty) return const [];
+    final body = await _sendApp(
+      (h) => _post(
+        _uri('/api/sync/push'),
+        h,
+        body: jsonEncode({
+          'categories': categories,
+          'expenses': expenses,
+        }),
+      ),
+    );
+    return [
+      for (final r in (body! as Map<String, dynamic>)['results'] as List)
+        SyncPushResult(
+          (r as Map<String, dynamic>)['id'] as String,
+          r['outcome'] as String,
+        ),
+    ];
+  }
+
+  /// Full server category list, createdAt asc then name asc. Used by the
+  /// sync engine to reconcile deletions that never tombstone.
+  Future<List<Map<String, dynamic>>> listCategories() async {
+    final body = await _sendApp(
+        (h) => _get(_uri('/api/categories'), h..remove('Content-Type')));
+    return (body! as List).cast<Map<String, dynamic>>();
   }
 }
 
