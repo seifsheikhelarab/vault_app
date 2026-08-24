@@ -10,6 +10,8 @@ import '../../features/budgets/budgets_screen.dart';
 import '../../features/chat/chat_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/expenses/expenses_screen.dart';
+import '../../features/recurring/recurring_editor_screen.dart';
+import '../../features/recurring/recurring_screen.dart';
 import '../../features/reports/reports_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/shell/home_shell.dart';
@@ -62,6 +64,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: ':id',
             builder: (_, state) =>
                 BudgetEditorScreen(budgetId: state.pathParameters['id']!),
+          ),
+        ],
+      ),
+      // Recurring rules mirror budgets: online-only CRUD, full-screen push.
+      GoRoute(
+        path: '/recurring',
+        builder: (_, _) => const RecurringScreen(),
+        routes: [
+          GoRoute(
+            path: ':id',
+            builder: (_, state) =>
+                RecurringEditorScreen(ruleId: state.pathParameters['id']!),
           ),
         ],
       ),

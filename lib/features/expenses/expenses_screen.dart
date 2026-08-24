@@ -263,7 +263,27 @@ class _ExpenseTile extends StatelessWidget {
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+          // Sourced-from-recurring marker (recurringDefinitionId arrived via
+          // sync). Neutral derived color: ember is capture-only and teal
+          // never shrinks to trim, so the badge abstains from both.
+          if (row.recurringId != null) ...[
+            const SizedBox(width: 6),
+            Tooltip(
+              message: 'Logged by a recurring rule',
+              child: Icon(
+                Icons.autorenew,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
+      ),
       subtitle: subtitle == null ? null : Text(subtitle),
       trailing: Text(
         formatEgp(row.amountMinor),
