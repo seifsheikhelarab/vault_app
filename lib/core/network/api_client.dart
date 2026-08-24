@@ -98,6 +98,10 @@ class ApiClient {
 
   Uri _uri(String path) => Uri.parse('$apiBaseUrl$path');
 
+  String _bareDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
   Future<Map<String, String>> _headers() async {
     final token = await readToken();
     return {
@@ -231,6 +235,72 @@ class ApiClient {
 
   Future<void> deleteBudget(String id) async {
     await _sendApp((h) => _delete(_uri('/api/budgets/$id'), h));
+  }
+
+  // ── Recurring (/api/recurring — online-only, like budgets) ─────────────
+
+  Future<List<Map<String, dynamic>>> listRecurring() async {
+    final body = await _sendApp(
+        (h) => _get(_uri('/api/recurring'), h..remove('Content-Type')));
+    return (body! as List).cast<Map<String, dynamic>>();
+  }
+
+  /// Server mints the rule id; returns the created row. [anchorDate] goes on
+  /// the wire as bare `YYYY-MM-DD` (contract §4); `interval` defaults to 1.
+  Future<Map<String, dynamic>> createRecurring({
+    required String name,
+    required int amountMinor,
+    required String frequency,
+    required DateTime anchorDate,
+    int interval = 1,
+    String? categoryId,
+  }) async {
+    final body = await _sendApp((h) => _post(
+          _uri('/api/recurring'),
+          h,
+          body: jsonEncode({
+            'name': name,
+            'amountMinor': amountMinor,
+            'frequency': frequency,
+            'anchorDate': _bareDate(anchorDate),
+            'interval': interval,
+            'categoryId': ?categoryId,
+          }),
+        ));
+    return body! as Map<String, dynamic>;
+  }
+
+  /// PATCH subset + `paused`. `categoryId` is only sent when non-null: the
+  /// contract documents null-clearing for expenses and budgets but not for
+  /// recurring, so an explicit null risks a 422.
+  Future<Map<String, dynamic>> updateRecurring(
+    String id, {
+    String? name,
+    int? amountMinor,
+    String? frequency,
+    DateTime? anchorDate,
+    int? interval,
+    String? categoryId,
+    bool? paused,
+  }) async {
+    final body = await _sendApp((h) => _patch(
+          _uri('/api/recurring/$id'),
+          h,
+          body: jsonEncode({
+            'name': ?name,
+            'amountMinor': ?amountMinor,
+            'frequency': ?frequency,
+            if (anchorDate != null) 'anchorDate': _bareDate(anchorDate),
+            'interval': ?interval,
+            'categoryId': ?categoryId,
+            'paused': ?paused,
+          }),
+        ));
+    return body! as Map<String, dynamic>;
+  }
+
+  Future<void> deleteRecurring(String id) async {
+    await _sendApp((h) => _delete(_uri('/api/recurring/$id'), h));
   }
 
   Future<void> signUpEmail({

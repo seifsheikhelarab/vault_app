@@ -64,6 +64,28 @@ class Budgets extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Cached recurring-rule row (`/api/recurring`, contract §8). Online-only
+/// writes like budgets; this table is a read cache of the server list minus
+/// server-only fields (userId, currency is fixed EGP, lastMaterializedAt).
+/// `frequency` is `'daily' | 'weekly' | 'monthly'`; `anchorDate`/`nextRunAt`
+/// store ISO instants (server sends anchor as ISO midnight).
+@DataClassName('RecurringRow')
+class Recurrings extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  IntColumn get amountMinor => integer()();
+  TextColumn get categoryId => text().nullable().references(Categories, #id)();
+  TextColumn get frequency => text()();
+  IntColumn get interval => integer().withDefault(const Constant(1))();
+  DateTimeColumn get anchorDate => dateTime()();
+  DateTimeColumn get nextRunAt => dateTime()();
+  BoolColumn get paused => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Key-value store for sync engine state. One row (`key = 'pull'`) holds
 /// the incremental pull cursor so it survives process restarts.
 @DataClassName('SyncStateRow')
@@ -75,12 +97,12 @@ class SyncState extends Table {
   Set<Column> get primaryKey => {key};
 }
 
-@DriftDatabase(tables: [Categories, Expenses, Budgets, SyncState])
+@DriftDatabase(tables: [Categories, Expenses, Budgets, Recurrings, SyncState])
 class VaultDatabase extends _$VaultDatabase {
   VaultDatabase(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -94,6 +116,7 @@ class VaultDatabase extends _$VaultDatabase {
             await m.addColumn(categories, categories.deletedAt);
             await m.addColumn(expenses, expenses.updatedAt);
           }
+          if (from < 4) await m.createTable(recurrings);
         },
       );
 }

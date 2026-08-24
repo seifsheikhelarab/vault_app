@@ -9,6 +9,7 @@ import 'db/vault_database.dart';
 import 'repositories/budgets_repository.dart';
 import 'repositories/categories_repository.dart';
 import 'repositories/expenses_repository.dart';
+import 'repositories/recurring_repository.dart';
 import 'sync/sync_providers.dart';
 
 /// Opens the on-disk database. Overridden with `NativeDatabase.memory()` in
@@ -46,6 +47,13 @@ final expensesRepositoryProvider = FutureProvider<ExpensesRepository>(
 
 final budgetsRepositoryProvider = FutureProvider<BudgetsRepository>(
   (ref) async => BudgetsRepository(
+    await ref.watch(vaultDatabaseProvider.future),
+    ref.watch(apiClientProvider),
+  ),
+);
+
+final recurringRepositoryProvider = FutureProvider<RecurringRepository>(
+  (ref) async => RecurringRepository(
     await ref.watch(vaultDatabaseProvider.future),
     ref.watch(apiClientProvider),
   ),
