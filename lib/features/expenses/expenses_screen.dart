@@ -5,6 +5,7 @@ import '../../core/money/money.dart';
 import '../../core/ui/empty_state.dart';
 import '../../data/db/vault_database.dart';
 import '../../data/providers.dart';
+import '../../data/sync/sync_providers.dart';
 import 'categories_sheet.dart';
 import 'day_grouping.dart';
 
@@ -145,14 +146,19 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         c.id: c.name,
     };
 
-    return NotificationListener<ScrollNotification>(
-      onNotification: _onScrollNotification,
-      child: ListView.builder(
-        padding: const EdgeInsets.only(top: 4, bottom: 96),
-        itemCount: groups.length,
-        itemBuilder: (_, index) => _DaySection(
-          group: groups[index],
-          categoryNames: categoryNames,
+    return RefreshIndicator(
+      onRefresh: () async =>
+          (await ref.read(syncSchedulerProvider.future)).refresh(),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _onScrollNotification,
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(top: 4, bottom: 96),
+          itemCount: groups.length,
+          itemBuilder: (_, index) => _DaySection(
+            group: groups[index],
+            categoryNames: categoryNames,
+          ),
         ),
       ),
     );

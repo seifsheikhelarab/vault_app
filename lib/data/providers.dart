@@ -9,6 +9,7 @@ import 'db/vault_database.dart';
 import 'repositories/budgets_repository.dart';
 import 'repositories/categories_repository.dart';
 import 'repositories/expenses_repository.dart';
+import 'sync/sync_providers.dart';
 
 /// Opens the on-disk database. Overridden with `NativeDatabase.memory()` in
 /// tests.
@@ -25,7 +26,8 @@ final vaultDatabaseProvider = FutureProvider<VaultDatabase>((ref) async {
 });
 
 final categoriesRepositoryProvider = FutureProvider<CategoriesRepository>(
-  (ref) async => CategoriesRepository(await ref.watch(vaultDatabaseProvider.future)),
+  (ref) async => CategoriesRepository(await ref.watch(vaultDatabaseProvider.future))
+    ..onMutated = (await ref.watch(syncSchedulerProvider.future)).nudge,
 );
 
 /// Live category list for chips and management UI. The stream instance is
@@ -38,7 +40,8 @@ final categoriesListProvider =
 });
 
 final expensesRepositoryProvider = FutureProvider<ExpensesRepository>(
-  (ref) async => ExpensesRepository(await ref.watch(vaultDatabaseProvider.future)),
+  (ref) async => ExpensesRepository(await ref.watch(vaultDatabaseProvider.future))
+    ..onMutated = (await ref.watch(syncSchedulerProvider.future)).nudge,
 );
 
 final budgetsRepositoryProvider = FutureProvider<BudgetsRepository>(
