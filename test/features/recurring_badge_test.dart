@@ -7,19 +7,17 @@ import 'package:vault_app/data/db/vault_database.dart';
 import 'package:vault_app/data/providers.dart';
 import 'package:vault_app/features/expenses/expenses_screen.dart';
 
-/// Unmounts while still inside the test's fake-async zone, then pumps so
-/// drift's internal stream-cleanup timers fire before the framework's
-/// no-pending-timers invariant check.
-void _flushTreeOnTearDown(WidgetTester tester) {
-  addTearDown(() async {
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-    await tester.pump();
-  });
+/// Unmounts while still inside the test's fake-async zone, then pumps once
+/// so drift's internal stream-cleanup timers fire before the framework's
+/// no-pending-timers invariant check. Must be awaited at the END of every
+/// test body — an addTearDown-based version runs outside the fake-async
+/// zone and leaves the timer pending.
+Future<void> _unmount(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
 }
 
 Future<void> _pumpScreen(WidgetTester tester, VaultDatabase db) async {
-  _flushTreeOnTearDown(tester);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [vaultDatabaseProvider.overrideWithValue(AsyncValue.data(db))],
@@ -82,6 +80,7 @@ void main() {
 
     // Tooltip carries the plain-language explanation.
     expect(find.byTooltip('Logged by a recurring rule'), findsOneWidget);
+    await _unmount(tester);
   });
 
   testWidgets('badge count follows the number of rule-sourced rows',
@@ -108,5 +107,6 @@ void main() {
     await _pumpScreen(tester, db);
 
     expect(find.byIcon(Icons.autorenew), findsNWidgets(2));
+    await _unmount(tester);
   });
 }

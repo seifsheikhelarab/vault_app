@@ -9,19 +9,17 @@ import 'package:vault_app/data/repositories/categories_repository.dart';
 import 'package:vault_app/data/repositories/expenses_repository.dart';
 import 'package:vault_app/features/reports/reports_screen.dart';
 
-/// Unmounts while still inside the test's fake-async zone, then pumps so
-/// drift's internal stream-cleanup timers fire before the framework's
-/// no-pending-timers invariant check.
-void _flushTreeOnTearDown(WidgetTester tester) {
-  addTearDown(() async {
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-    await tester.pump();
-  });
+/// Unmounts while still inside the test's fake-async zone, then pumps once
+/// so drift's internal stream-cleanup timers fire before the framework's
+/// no-pending-timers invariant check. Must be awaited at the END of every
+/// test body — an addTearDown-based version runs outside the fake-async
+/// zone and leaves the timer pending.
+Future<void> _unmount(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
 }
 
 Future<void> _pumpReports(WidgetTester tester, VaultDatabase db) async {
-  _flushTreeOnTearDown(tester);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [vaultDatabaseProvider.overrideWithValue(AsyncValue.data(db))],
@@ -54,6 +52,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('No spending this month'), findsOneWidget);
+      await _unmount(tester);
     });
 
     testWidgets('pie legend breaks spend down by category and uncategorized',
@@ -76,6 +75,13 @@ void main() {
       await _pumpReports(tester, db);
 
       expect(find.text('Food'), findsOneWidget);
+      // Second legend row sits below the fold of the lazy ListView.
+      for (var i = 0;
+          i < 5 && find.text('Uncategorized').evaluate().isEmpty;
+          i++) {
+        await tester.drag(find.byType(ListView).first, const Offset(0, -200));
+        await tester.pumpAndSettle();
+      }
       expect(find.text('Uncategorized'), findsOneWidget);
       expect(find.text('EGP 25.00'), findsOneWidget);
       expect(find.text('EGP 10.00'), findsOneWidget);
@@ -87,6 +93,7 @@ void main() {
       expect(find.text('Food'), findsOneWidget);
       expect(find.text('EGP 25.00'), findsOneWidget);
       expect(find.text('EGP 99.00'), findsNothing);
+      await _unmount(tester);
     });
 
     testWidgets('trend line renders daily points without crashing',
@@ -116,6 +123,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(LineChart), findsOneWidget);
+      await _unmount(tester);
     });
   });
 }

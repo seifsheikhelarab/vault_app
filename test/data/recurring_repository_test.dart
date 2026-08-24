@@ -2,12 +2,61 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vault_app/core/network/api_client.dart';
 import 'package:vault_app/data/db/vault_database.dart';
 import 'package:vault_app/data/repositories/recurring_repository.dart';
+
+/// In-memory stand-in for secure storage so no platform channel is touched.
+class _FakeStorage extends FlutterSecureStorage {
+  final Map<String, String> values = {};
+
+  @override
+  Future<String?> read({
+    required String key,
+    AndroidOptions? aOptions,
+    AppleOptions? iOptions,
+    LinuxOptions? lOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+    WebOptions? webOptions,
+  }) async =>
+      values[key];
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (value == null) {
+      values.remove(key);
+    } else {
+      values[key] = value;
+    }
+  }
+
+  @override
+  Future<void> delete({
+    required String key,
+    AndroidOptions? aOptions,
+    AppleOptions? iOptions,
+    LinuxOptions? lOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+    WebOptions? webOptions,
+  }) async {
+    values.remove(key);
+  }
+}
 
 /// Server-shaped `/api/recurring` row (contract §8): every field always
 /// returned, anchorDate an ISO midnight instant.
@@ -82,6 +131,7 @@ void main() {
           'error': {'code': 'NOT_FOUND', 'message': 'Not found'}
         }, 404);
       }),
+      storage: _FakeStorage(),
     );
     repo = RecurringRepository(db, api);
   });

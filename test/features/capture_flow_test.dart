@@ -9,17 +9,15 @@ import 'package:vault_app/features/expenses/capture_fab.dart';
 
 /// Unmounts while still inside the test's fake-async zone, then pumps once
 /// so drift's internal stream-cleanup timers fire before the framework's
-/// no-pending-timers invariant check. Registered by every harness below.
-void _flushTreeOnTearDown(WidgetTester tester) {
-  addTearDown(() async {
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-    await tester.pump();
-  });
+/// no-pending-timers invariant check. Must be awaited at the END of every
+/// test body — an addTearDown-based version runs outside the fake-async
+/// zone and leaves the timer pending.
+Future<void> _unmount(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
 }
 
 Future<void> _pumpHarness(WidgetTester tester, VaultDatabase db) async {
-  _flushTreeOnTearDown(tester);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [vaultDatabaseProvider.overrideWithValue(AsyncValue.data(db))],
@@ -55,6 +53,7 @@ void main() {
       expect(find.text('Uncategorized'), findsOneWidget);
       expect(
           find.widgetWithText(FilledButton, 'Save expense'), findsOneWidget);
+      await _unmount(tester);
     });
 
     testWidgets('decimal keypad rejects a third decimal place',
@@ -73,6 +72,7 @@ void main() {
       await tester.enterText(_amountField, '1.2.3');
       expect(tester.widget<TextFormField>(_amountField).controller!.text,
           '12.34');
+      await _unmount(tester);
     });
 
     testWidgets('empty amount shows inline error and writes nothing',
@@ -86,6 +86,7 @@ void main() {
 
       expect(find.text('Enter an amount'), findsOneWidget);
       expect(await db.select(db.expenses).get(), isEmpty);
+      await _unmount(tester);
     });
 
     testWidgets('saving offline writes UUID row with pendingSync flag',
@@ -122,6 +123,7 @@ void main() {
       // Sheet closed, gentle status shown.
       expect(find.text('Log an expense'), findsNothing);
       expect(find.textContaining('sync when online'), findsOneWidget);
+      await _unmount(tester);
     });
 
     testWidgets('capture works without any categories yet', (tester) async {
@@ -138,6 +140,7 @@ void main() {
       expect(rows, hasLength(1));
       expect(rows.single.categoryId, isNull);
       expect(rows.single.amountMinor, 2000);
+      await _unmount(tester);
     });
   });
 }

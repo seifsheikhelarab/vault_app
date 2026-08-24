@@ -8,19 +8,17 @@ import 'package:vault_app/data/repositories/categories_repository.dart';
 import 'package:vault_app/data/repositories/expenses_repository.dart';
 import 'package:vault_app/features/expenses/expenses_screen.dart';
 
-/// Unmounts while still inside the test's fake-async zone, then pumps so
-/// drift's internal stream-cleanup timers fire before the framework's
-/// no-pending-timers invariant check.
-void _flushTreeOnTearDown(WidgetTester tester) {
-  addTearDown(() async {
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-    await tester.pump();
-  });
+/// Unmounts while still inside the test's fake-async zone, then pumps once
+/// so drift's internal stream-cleanup timers fire before the framework's
+/// no-pending-timers invariant check. Must be awaited at the END of every
+/// test body — an addTearDown-based version runs outside the fake-async
+/// zone and leaves the timer pending.
+Future<void> _unmount(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
 }
 
 Future<void> _pumpScreen(WidgetTester tester, VaultDatabase db) async {
-  _flushTreeOnTearDown(tester);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [vaultDatabaseProvider.overrideWithValue(AsyncValue.data(db))],
@@ -70,15 +68,18 @@ void main() {
       expect(find.text('Yesterday'), findsOneWidget);
       expect(_olderHeaderFinder, findsOneWidget);
       expect(find.text('EGP 125.00'), findsOneWidget); // coffee + lunch
-      expect(find.text('EGP 50.00'), findsOneWidget);
-      expect(find.text('EGP 125.50'), findsOneWidget); // taxi
+      // Tile trailing amount and day-total header coincide when a day has
+      // exactly one expense.
+      expect(find.text('EGP 50.00'), findsNWidgets(2));
+      expect(find.text('EGP 125.50'), findsNWidgets(2)); // taxi
 
       // Newest-first ordering of the day headers.
       expect(tester.getTopLeft(find.text('Today')).dy,
           lessThan(tester.getTopLeft(find.text('Yesterday')).dy));
       expect(tester.getTopLeft(find.text('Yesterday')).dy,
           lessThan(tester.getTopLeft(_olderHeaderFinder).dy));
-    });
+      await _unmount(tester);
+  });
 
     testWidgets('category chips filter the list via local query',
         (tester) async {
@@ -101,16 +102,19 @@ void main() {
       expect(find.text('groceries'), findsOneWidget);
       expect(find.text('electricity'), findsOneWidget);
 
-      await tester.tap(find.text('Bills'));
+      // Scope to the filter chip: the expense tile subtitle says 'Bills' too.
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Bills'));
       await tester.pumpAndSettle();
 
       expect(find.text('electricity'), findsOneWidget);
       expect(find.text('groceries'), findsNothing);
-      expect(find.text('EGP 300.00'), findsOneWidget);
+      // Single-expense day: tile amount equals the day total.
+      expect(find.text('EGP 300.00'), findsNWidgets(2));
 
-      await tester.tap(find.text('All'));
+      await tester.tap(find.widgetWithText(ChoiceChip, 'All'));
       await tester.pumpAndSettle();
       expect(find.text('groceries'), findsOneWidget);
+      await _unmount(tester);
     });
 
     testWidgets('empty history keeps the honest empty state',
@@ -121,9 +125,10 @@ void main() {
       // A filtered-but-empty list says so instead.
       await categories.create('Food');
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Food'));
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Food'));
       await tester.pumpAndSettle();
       expect(find.text('Nothing in this category'), findsOneWidget);
+      await _unmount(tester);
     });
 
     testWidgets('infinite scroll grows the purely-local page',
@@ -156,6 +161,7 @@ void main() {
       // Daily total covers every loaded row of the day.
       expect(find.text('EGP ${(totalMinor / 100).toStringAsFixed(2)}'),
           findsOneWidget);
+      await _unmount(tester);
     });
   });
 }

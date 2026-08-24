@@ -92,19 +92,17 @@ Widget appUnderTest() => ProviderScope(
       child: const VaultApp(),
     );
 
-/// Unmounts while still inside the test's fake-async zone, then pumps so
-/// drift's internal stream-cleanup timers fire before the framework's
-/// no-pending-timers invariant check.
-void flushTreeOnTearDown(WidgetTester tester) {
-  addTearDown(() async {
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
-    await tester.pump();
-  });
+/// Unmounts while still inside the test's fake-async zone, then pumps once
+/// so drift's internal stream-cleanup timers fire before the framework's
+/// no-pending-timers invariant check. Must be awaited at the END of every
+/// test body — an addTearDown-based version runs outside the fake-async
+/// zone and leaves the timer pending.
+Future<void> unmount(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
 }
 
 Future<void> pumpApp(WidgetTester tester) async {
-  flushTreeOnTearDown(tester);
   await tester.pumpWidget(appUnderTest());
   await tester.pumpAndSettle();
 }
@@ -127,6 +125,7 @@ void main() {
     await pumpApp(tester);
     expect(find.text('Vault'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);
+    await unmount(tester);
   });
 
   testWidgets('sign-in validates empty and malformed input', (tester) async {
@@ -144,6 +143,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Enter a valid email'), findsOneWidget);
     expect(find.text('Use at least 8 characters'), findsOneWidget);
+    await unmount(tester);
   });
 
   testWidgets('valid sign-in reaches the four-tab shell with capture FAB',
@@ -156,6 +156,7 @@ void main() {
     for (final label in ['Dashboard', 'Expenses', 'Chat', 'Settings']) {
       expect(navLabel(label), findsOneWidget);
     }
+    await unmount(tester);
   });
 
   testWidgets('tabs switch branches', (tester) async {
@@ -171,7 +172,13 @@ void main() {
 
     await tester.tap(navLabel('Settings'));
     await tester.pumpAndSettle();
+    // Sign out sits at the bottom of a lazy ListView — bring it into the
+    // viewport before asserting.
+    await tester.dragUntilVisible(
+        find.text('Sign out'), find.byType(ListView), const Offset(0, -250));
+    await tester.pumpAndSettle();
     expect(find.text('Sign out'), findsOneWidget);
+    await unmount(tester);
   });
 
   testWidgets('sign out returns to sign-in', (tester) async {
@@ -179,10 +186,14 @@ void main() {
 
     await tester.tap(navLabel('Settings'));
     await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+        find.text('Sign out'), find.byType(ListView), const Offset(0, -250));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);
+    await unmount(tester);
   });
 
   testWidgets('capture FAB opens the log-an-expense sheet', (tester) async {
@@ -192,6 +203,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Log an expense'), findsOneWidget);
+    await unmount(tester);
   });
 
   testWidgets('sign-up screen toggles from sign-in and validates',
@@ -208,5 +220,6 @@ void main() {
     expect(find.text('Enter your name'), findsOneWidget);
     expect(find.text('Enter your email'), findsOneWidget);
     expect(find.text('Enter your password'), findsOneWidget);
+    await unmount(tester);
   });
 }

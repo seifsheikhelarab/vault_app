@@ -199,7 +199,8 @@ class ExpensesRepository {
     final query = _db.selectOnly(_db.expenses)
       ..addColumns([_db.expenses.categoryId, total])
       ..where(_db.expenses.occurredAt.isBiggerOrEqualValue(start) &
-          _db.expenses.occurredAt.isSmallerThanValue(end));
+          _db.expenses.occurredAt.isSmallerThanValue(end))
+      ..groupBy([_db.expenses.categoryId]);
     return query.watch().map((rows) => {
           for (final row in rows)
             row.read(_db.expenses.categoryId): row.read(total) ?? 0,
