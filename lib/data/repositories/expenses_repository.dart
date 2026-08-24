@@ -62,6 +62,42 @@ class ExpensesRepository {
         );
   }
 
+  /// Stages an edit: the row is rewritten locally and marked dirty so the
+  /// next sync cycle pushes it whole-row (LWW).
+  Future<void> update({
+    required String id,
+    required int amountMinor,
+    String? categoryId,
+    required DateTime occurredAt,
+    String? note,
+  }) async {
+    await (_db.update(_db.expenses)..where((e) => e.id.equals(id))).write(
+      ExpensesCompanion(
+        amountMinor: Value(amountMinor),
+        categoryId: Value(categoryId),
+        occurredAt: Value(occurredAt),
+        note: Value(note),
+        pendingSync: const Value(true),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+    onMutated?.call();
+  }
+
+  /// Stages the deletion as a tombstone; the row vanishes from live queries
+  /// now and the pushed delete removes it server-side. Mirrors the category
+  /// delete shape so the sync engine needs no special case.
+  Future<void> delete(String id) async {
+    await (_db.update(_db.expenses)..where((e) => e.id.equals(id))).write(
+      ExpensesCompanion(
+        deletedAt: Value(DateTime.now()),
+        updatedAt: Value(DateTime.now()),
+        pendingSync: const Value(true),
+      ),
+    );
+    onMutated?.call();
+  }
+
   /// Newest-first page for purely-local infinite scroll. `limit` grows as
   /// the user scrolls; the stream re-emits on any local mutation.
   Stream<List<ExpenseRow>> watchPage({

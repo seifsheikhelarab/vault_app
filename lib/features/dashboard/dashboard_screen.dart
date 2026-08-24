@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/format/date_labels.dart';
 import '../../core/money/money.dart';
 import '../../core/stream/latest_all.dart';
 import '../../core/ui/empty_state.dart';
 import '../../data/db/vault_database.dart';
 import '../../data/providers.dart';
+import '../budgets/budget_providers.dart';
 
 /// Everything the dashboard renders, computed purely from the local DB.
 class DashboardData {
@@ -62,12 +64,7 @@ final _dashboardProvider = StreamProvider.autoDispose<DashboardData>((ref) {
   );
 });
 
-const _monthAbbrevs = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
-String _formatDay(DateTime d) => '${d.day} ${_monthAbbrevs[d.month - 1]}';
+String _formatDay(DateTime d) => '${d.day} ${monthsShort[d.month - 1]}';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -99,14 +96,17 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-class _DashboardContent extends StatelessWidget {
+class _DashboardContent extends ConsumerWidget {
   const _DashboardContent({required this.data});
 
   final DashboardData data;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final progress = ref.watch(budgetProgressProvider);
+    final categories = ref.watch(categoriesListProvider).value ?? const [];
+    final names = {for (final c in categories) c.id: c.name};
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 96),
       children: [
@@ -177,6 +177,55 @@ class _DashboardContent extends StatelessWidget {
           icon: const Icon(Icons.savings_outlined),
           label: const Text('Manage budgets'),
         ),
+        if (progress.isNotEmpty) ...[
+          Text(
+            'Budgets',
+            style: theme.textTheme.labelLarge
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 8),
+          for (final p in progress)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => context.push('/budgets/${p.budget.id}'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            p.budget.categoryId == null
+                                ? 'Overall'
+                                : names[p.budget.categoryId] ?? 'Category',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${formatEgp(p.spent)} / ${formatEgp(p.limitMinor)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    LinearProgressIndicator(
+                      value: p.ratio,
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
         if (data.recent.isNotEmpty) ...[
           Text(
             'Recent expenses',

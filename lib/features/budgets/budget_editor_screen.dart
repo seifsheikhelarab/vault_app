@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/money/money.dart';
 import '../../core/network/api_client.dart';
+import '../../core/ui/offline_banner.dart';
 import '../../data/db/vault_database.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/budgets_repository.dart';
@@ -65,18 +66,10 @@ class _BudgetEditorScreenState extends ConsumerState<BudgetEditorScreen> {
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
           children: [
             if (!online) ...[
-              Material(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius:
-                    BorderRadius.circular(12),
-                child: ListTile(
-                  leading: const Icon(Icons.cloud_off_outlined),
-                  title: const Text("You're offline",
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text(
-                      'Budget changes need a connection — budgets are never synced offline.'),
-                  dense: true,
-                ),
+              OfflineBanner(
+                message:
+                    'Budget changes need a connection — budgets are never synced offline.',
+                rounded: true,
               ),
               const SizedBox(height: 16),
             ],

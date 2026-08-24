@@ -7,6 +7,7 @@ import '../../data/db/vault_database.dart';
 import '../../data/providers.dart';
 import '../../data/sync/sync_providers.dart';
 import 'categories_sheet.dart';
+import 'capture_sheet.dart';
 import 'day_grouping.dart';
 
 const _pageSize = 30;
@@ -263,6 +264,7 @@ class _ExpenseTile extends StatelessWidget {
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      onTap: () => showCaptureSheet(context, expense: row),
       title: Row(
         children: [
           Flexible(

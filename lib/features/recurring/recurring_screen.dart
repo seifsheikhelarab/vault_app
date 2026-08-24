@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/money/money.dart';
+import '../../core/network/connectivity_provider.dart';
 import '../../core/ui/empty_state.dart';
+import '../../core/ui/offline_banner.dart';
 import '../../data/providers.dart';
 import '../expenses/day_grouping.dart';
 import 'recurring_providers.dart';
@@ -35,18 +37,9 @@ class RecurringScreen extends ConsumerWidget {
       body: Column(
         children: [
           if (!online)
-            Material(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: ListTile(
-                leading: const Icon(Icons.cloud_off_outlined),
-                title: const Text(
-                  "You're offline",
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: const Text(
-                    'Showing saved rules. Creating or editing needs a connection — rules are not synced offline.'),
-                dense: true,
-              ),
+            const OfflineBanner(
+              message:
+                  'Showing saved rules. Creating or editing needs a connection — rules are not synced offline.',
             ),
           Expanded(
             child: rules.when(

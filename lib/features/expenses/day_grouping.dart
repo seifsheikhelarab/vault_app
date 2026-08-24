@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart' show DateUtils;
 
+import '../../core/format/date_labels.dart';
 import '../../data/db/vault_database.dart';
-
-const _months = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
-const _weekdays = [
-  'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
-];
 
 DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
 /// Short human date used by the capture sheet's date picker button.
 String formatFullDate(DateTime d) =>
-    '${_weekdays[d.weekday - 1]}, ${d.day} ${_months[d.month - 1]} ${d.year}';
+    '${weekdaysShort[d.weekday - 1]}, ${d.day} ${monthsShort[d.month - 1]} ${d.year}';
 
 /// List-section header for a day bucket: Today/Yesterday, else
 /// `"Wed, 19 Aug"` (with the year when it differs from the current one).
@@ -25,8 +17,8 @@ String formatDayHeader(DateTime day) {
   final diff = today.difference(target).inDays;
   if (diff == 0) return 'Today';
   if (diff == 1) return 'Yesterday';
-  final base = '${_weekdays[target.weekday - 1]}, '
-      '${target.day} ${_months[target.month - 1]}';
+  final base = '${weekdaysShort[target.weekday - 1]}, '
+      '${target.day} ${monthsShort[target.month - 1]}';
   return target.year == today.year ? base : '$base ${target.year}';
 }
 

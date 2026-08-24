@@ -3,12 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/money/money.dart';
 import '../../core/ui/money_input_formatter.dart';
+import '../../data/db/vault_database.dart';
 import '../../data/providers.dart';
 import 'category_picker.dart';
 import 'day_grouping.dart';
 
-/// Rising slab (28px crown) holding the capture form.
-Future<void> showCaptureSheet(BuildContext context) {
+/// Rising slab (28px crown) holding the capture form. Pass [expense] to edit
+/// an existing row instead: same sheet, prefilled, with a delete action.
+Future<void> showCaptureSheet(
+  BuildContext context, {
+  ExpenseRow? expense,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -16,24 +21,45 @@ Future<void> showCaptureSheet(BuildContext context) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
-    builder: (_) => const CaptureSheet(),
+    builder: (_) => CaptureSheet(expense: expense),
   );
 }
 
 class CaptureSheet extends ConsumerStatefulWidget {
-  const CaptureSheet({super.key});
+  const CaptureSheet({this.expense, super.key});
+
+  final ExpenseRow? expense;
 
   @override
   ConsumerState<CaptureSheet> createState() => _CaptureSheetState();
 }
 
 class _CaptureSheetState extends ConsumerState<CaptureSheet> {
-  final _amountController = TextEditingController();
-  final _noteController = TextEditingController();
-  DateTime _date = DateTime.now();
+  late final TextEditingController _amountController;
+  late final TextEditingController _noteController;
+  late DateTime _date;
   String? _categoryId;
   String? _amountError;
   bool _saving = false;
+
+  ExpenseRow? get _editing => widget.expense;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = _editing;
+    if (e == null) {
+      _amountController = TextEditingController();
+      _noteController = TextEditingController();
+      _date = DateTime.now();
+    } else {
+      _amountController =
+          TextEditingController(text: formatPiasters(e.amountMinor));
+      _noteController = TextEditingController(text: e.note ?? '');
+      _date = e.occurredAt.toLocal();
+      _categoryId = e.categoryId;
+    }
+  }
 
   @override
   void dispose() {
@@ -67,16 +93,67 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
     try {
       final repo = await ref.read(expensesRepositoryProvider.future);
       final note = _noteController.text.trim();
-      await repo.create(
-        amountMinor: amountMinor,
-        categoryId: _categoryId,
-        occurredAt: _date,
-        note: note.isEmpty ? null : note,
-      );
+      final e = _editing;
+      if (e == null) {
+        await repo.create(
+          amountMinor: amountMinor,
+          categoryId: _categoryId,
+          occurredAt: _date,
+          note: note.isEmpty ? null : note,
+        );
+      } else {
+        await repo.update(
+          id: e.id,
+          amountMinor: amountMinor,
+          categoryId: _categoryId,
+          occurredAt: _date,
+          note: note.isEmpty ? null : note,
+        );
+      }
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Expense saved — it will sync when online.')),
+        SnackBar(
+          content: Text(_editing == null
+              ? 'Expense saved — it will sync when online.'
+              : 'Expense updated — it will sync when online.'),
+        ),
+      );
+    } catch (_) {
+      if (mounted) setState(() => _saving = false);
+      rethrow;
+    }
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this expense?'),
+        content: const Text(
+            'It is removed here and on the server the next time Vault syncs.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _saving = true);
+    try {
+      final repo = await ref.read(expensesRepositoryProvider.future);
+      await repo.delete(_editing!.id);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Expense deleted — it will sync when online.')),
       );
     } catch (_) {
       if (mounted) setState(() => _saving = false);
@@ -97,7 +174,7 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Log an expense',
+              _editing == null ? 'Log an expense' : 'Edit expense',
               style: Theme.of(context)
                   .textTheme
                   .titleMedium
@@ -158,12 +235,22 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
                       height: 22,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Save expense'),
+                  : Text(_editing == null ? 'Save expense' : 'Save changes'),
             ),
+            if (_editing != null) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _saving ? null : _confirmDelete,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Delete expense'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 }
-

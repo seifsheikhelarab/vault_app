@@ -102,7 +102,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: const Text('Force resync?'),
         content: const Text(
           'Clears local expenses and categories and re-downloads everything '
-          'from the server. Unsaved local changes are pushed first.',
+          'from the server. Unsynced changes are pushed first when a '
+          'connection is available — if you are offline or the push fails, '
+          'they are lost.',
         ),
         actions: [
           TextButton(

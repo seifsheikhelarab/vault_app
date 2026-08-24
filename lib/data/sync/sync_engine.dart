@@ -62,9 +62,19 @@ class SyncEngine {
 
   /// Clears the pull cursor so the next cycle re-pulls full history.
   /// With [wipeLocalData] also drops the local synced tables (expenses,
-  /// categories) — budgets stay, they are an online-only cache. Exposed for
-  /// a future Settings entry; no UI yet.
+  /// categories) — budgets stay, they are an online-only cache. Unsynced
+  /// local changes are pushed first (best effort): if the device is offline
+  /// or the push fails permanently, those edits are lost and callers should
+  /// say so in their confirmation copy.
   Future<void> forceResync({bool wipeLocalData = false}) async {
+    if (wipeLocalData) {
+      try {
+        await _pushDirty();
+      } catch (_) {
+        // Best-effort salvage; the wipe proceeds regardless so resync can
+        // still fulfill its recovery purpose.
+      }
+    }
     await (_db.delete(_db.syncState)..where((s) => s.key.equals(_cursorKey)))
         .go();
     if (wipeLocalData) {
@@ -104,6 +114,8 @@ class SyncEngine {
       // `conflict-lost` still means the server holds the authoritative row,
       // so both outcomes clear the flag.
       final settled = results.map((r) => r.id).toSet();
+      final anyConflictLost =
+          results.any((r) => r.outcome == 'conflict-lost');
 
       await _db.transaction(() async {
         for (final c in catChunk) {
@@ -128,6 +140,13 @@ class SyncEngine {
           }
         }
       });
+      if (anyConflictLost && i == 0) {
+        // The server rejected some pushed rows in favor of its own versions,
+        // but the pull cursor has already advanced past those writes. Reset
+        // the cursor so the next drain refetches the winning state;
+        // otherwise the losing local copy would diverge forever.
+        await _writeCursor(null);
+      }
     }
   }
 

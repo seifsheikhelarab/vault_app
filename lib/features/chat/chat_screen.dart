@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/money/money.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/connectivity_provider.dart';
+import '../../core/theme/vault_theme.dart';
 import '../../core/ui/empty_state.dart';
 import '../../core/ui/money_input_formatter.dart';
 import '../../data/providers.dart';
@@ -340,8 +341,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           FilledButton(
             // Ember law: this is the capture-confirm action.
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFE8562A),
-              foregroundColor: Colors.white,
+              backgroundColor: VaultColors.ember,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               minimumSize: const Size.fromHeight(52),
             ),
             onPressed: _saving ? null : _confirm,

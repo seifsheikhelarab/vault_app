@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/format/date_labels.dart';
 import '../../core/money/money.dart';
 import '../../core/stream/latest_all.dart';
 import '../../core/ui/empty_state.dart';
@@ -66,8 +67,6 @@ final _reportsProvider =
     ),
   );
 });
-
-const _weekdayAbbrevs = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -399,7 +398,7 @@ class _TrendLine extends StatelessWidget {
     if (day < 0 || day >= bounds.days) return const SizedBox.shrink();
     final date = bounds.start.add(Duration(days: day));
     final label = bounds.days <= 7
-        ? _weekdayAbbrevs[date.weekday - DateTime.monday]
+        ? weekdaysShort[date.weekday - DateTime.monday]
         : '${date.day}';
     return Padding(
       padding: const EdgeInsets.only(top: 4),

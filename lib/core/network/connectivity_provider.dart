@@ -9,3 +9,11 @@ final connectivityProvider = StreamProvider<bool>((ref) {
       .onConnectivityChanged
       .map((results) => results.any((r) => r != ConnectivityResult.none));
 });
+
+/// Collapse an [AsyncValue] of [connectivityProvider] to a plain bool:
+/// loading counts as online (real request errors speak instead).
+bool isOnline(AsyncValue<bool> state) => state.value ?? true;
+
+/// One-line online read for gating UI and writes.
+final isOnlineProvider =
+    Provider.autoDispose<bool>((ref) => isOnline(ref.watch(connectivityProvider)));

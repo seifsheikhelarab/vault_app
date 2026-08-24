@@ -108,7 +108,13 @@ void main() {
       expect(keptRow.amountMinor, 500);
       expect(keptRow.pendingSync, true, reason: 'nulled reference must resync');
       expect(untouchedRow.categoryId, isNull);
-      expect(await (db.select(db.categories)).get(), isEmpty);
+
+      final tombstoned =
+          await (db.select(db.categories)..where((c) => c.id.equals(food.id)))
+              .getSingle();
+      expect(tombstoned.deletedAt, isNotNull,
+          reason: 'delete stages a tombstone for sync');
+      expect(tombstoned.pendingSync, true);
     });
   });
 
@@ -150,14 +156,25 @@ void main() {
       expect(next.map((c) => c.name), ['Food']);
     });
 
-    test('delete removes only the target category', () async {
+    test('delete stages a tombstone; live reads exclude it', () async {
       final food = await categories.create('Food');
       await categories.create('Bills');
 
       await categories.delete(food.id);
 
-      final left = await (db.select(db.categories)).get();
-      expect(left.map((c) => c.name), ['Bills']);
+      final live = await categories.watchAll().first;
+      expect(live.map((c) => c.name), ['Bills']);
+
+      final raw = await (db.select(db.categories)
+            ..where((c) => c.id.equals(food.id)))
+          .getSingle();
+      expect(raw.deletedAt, isNotNull);
+      expect(raw.pendingSync, true);
+
+      final others = await (db.select(db.categories)
+            ..where((c) => c.deletedAt.isNull()))
+          .get();
+      expect(others.map((c) => c.name), ['Bills']);
     });
   });
 }
