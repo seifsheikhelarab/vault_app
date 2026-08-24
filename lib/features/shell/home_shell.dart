@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/vault_theme.dart';
+import '../expenses/capture_fab.dart';
 
 /// Four-destination shell. The ember FAB is the capture action — the only
 /// element in the world allowed to burn hot.
@@ -14,20 +14,7 @@ class HomeShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: shell,
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: VaultColors.ember,
-        foregroundColor: Colors.white,
-        tooltip: 'Log an expense',
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('Expense capture arrives with the expenses release.'),
-            ),
-          );
-        },
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: const CaptureFab(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (index) =>

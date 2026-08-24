@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Flutter client for Vault (expense tracker). App code is currently a fresh Flutter template; the backend lives in a separate repo.
+Flutter client for Vault (expense tracker). The backend lives in a separate repo (`../Vault`).
 
 ## Backend contract — read first
 
@@ -22,7 +22,16 @@ flutter test test/widget_test.dart --name "<substring>"   # single test
 flutter run              # dev run (hot reload: r, hot restart: R)
 ```
 
-No codegen, no build_runner, no CI configured yet. Lints: `flutter_lints` defaults via `analysis_options.yaml`.
+Drift codegen via `dart run build_runner build --delete-conflicting-outputs` after editing `lib/data/db/vault_database.dart` — commit the regenerated `.g.dart`. No CI configured yet. Lints: `flutter_lints` defaults via `analysis_options.yaml`.
+
+## Hard timeout policy
+
+Every shell command MUST carry an explicit timeout — never run bare:
+
+- Default tooling calls (`git`, `gh`, `ls`, file ops): **120000 ms**
+- Flutter/Dart heavy commands (`pub get`, `analyze`, `test`, `build_runner`, gradle builds): **900000 ms**
+- On timeout/hang: retry at most twice, then STOP and report the blocker instead of spinning.
+- Applies recursively: any agent/subagent working in this repo inherits this rule and must pass explicit timeouts to its own shell calls.
 
 ## Agent skills
 

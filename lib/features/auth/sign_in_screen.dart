@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'auth_form.dart';
 import 'auth_scaffold.dart';
 import 'session_controller.dart';
 
@@ -12,11 +13,11 @@ class SignInScreen extends ConsumerStatefulWidget {
   ConsumerState<SignInScreen> createState() => _SignInScreenState();
 }
 
-class _SignInScreenState extends ConsumerState<SignInScreen> {
+class _SignInScreenState extends ConsumerState<SignInScreen>
+    with AuthFormMixin {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  bool _busy = false;
 
   @override
   void dispose() {
@@ -25,27 +26,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     super.dispose();
   }
 
-  String? _validateEmail(String? value) {
-    final v = value?.trim() ?? '';
-    if (v.isEmpty) return 'Enter your email';
-    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v)) {
-      return 'Enter a valid email';
-    }
-    return null;
-  }
-
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) return 'Enter your password';
-    if (value.length < 8) return 'Use at least 8 characters';
-    return null;
-  }
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _busy = true);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    if (!mounted) return;
-    ref.read(sessionProvider.notifier).signIn();
+    await runAuth(() => ref
+        .read(sessionProvider.notifier)
+        .signIn(_email.text.trim(), _password.text));
   }
 
   @override
@@ -63,7 +48,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
               textInputAction: TextInputAction.next,
-              validator: _validateEmail,
+              validator: validateEmail,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -72,18 +57,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               obscureText: true,
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => _submit(),
-              validator: _validatePassword,
+              validator: validatePassword,
             ),
             const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _busy ? null : _submit,
-              child: _busy
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2.4),
-                    )
-                  : const Text('Sign in'),
+            AuthSubmitButton(
+              label: 'Sign in',
+              busy: busy,
+              onPressed: _submit,
             ),
             const SizedBox(height: 12),
             Row(
