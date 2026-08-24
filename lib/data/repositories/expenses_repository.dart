@@ -162,4 +162,33 @@ class ExpensesRepository {
             row.read(_db.expenses.categoryId): row.read(total) ?? 0,
         });
   }
+
+  /// Live spend totals (piasters) per day within the half-open window
+  /// `[start, end)`, keyed by whole days elapsed from [start] (so day `0`
+  /// is [start]'s own local day). Days with no spend are absent. Feeds the
+  /// reports trend line; callers fill gaps with zeros.
+  Stream<Map<int, int>> watchSpendPerDay({
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final startEpochSeconds = start.millisecondsSinceEpoch ~/ 1000;
+    final query = _db.customSelect(
+      'SELECT CAST((occurred_at - ?) / 86400 AS INTEGER) AS day, '
+      'SUM(amount_minor) AS total '
+      'FROM expenses '
+      'WHERE occurred_at >= ? AND occurred_at < ? '
+      'GROUP BY day',
+      variables: [
+        Variable.withInt(startEpochSeconds),
+        Variable.withDateTime(start),
+        Variable.withDateTime(end),
+      ],
+      readsFrom: {_db.expenses},
+    );
+    return query.watch().map(
+          (rows) => {
+            for (final row in rows) row.read<int>('day'): row.read<int>('total'),
+          },
+        );
+  }
 }
