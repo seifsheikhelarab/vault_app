@@ -324,7 +324,9 @@ class ApiClient {
   /// [cursor]; loop until `nextCursor` is null.
   Future<SyncPullPage> pullSync({required int limit, String? cursor}) async {
     final body = await _sendApp((h) => _get(
-          _uri('/api/sync/pull?limit=$limit${cursor == null ? '' : '&cursor=$cursor'}'),
+          _uri('/api/sync/pull').replace(
+            queryParameters: {'limit': '$limit', 'cursor': ?cursor},
+          ),
           h..remove('Content-Type'),
         ));
     final json = body! as Map<String, dynamic>;
