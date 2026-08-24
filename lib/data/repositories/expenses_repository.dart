@@ -11,6 +11,11 @@ class ExpensesRepository {
 
   final VaultDatabase _db;
 
+  /// Fired after a local write that the sync engine still owes the server,
+  /// so it can schedule a debounced cycle. Wired by `syncSchedulerProvider`;
+  /// nullable to keep plain-DB tests friction-free.
+  void Function()? onMutated;
+
   Future<ExpenseRow> create({
     required int amountMinor,
     String? categoryId,
@@ -27,8 +32,10 @@ class ExpensesRepository {
             note: Value(note),
             pendingSync: const Value(true),
             recurringId: const Value(null),
+            updatedAt: Value(DateTime.now()),
           ),
         );
+    onMutated?.call();
     return (_db.select(_db.expenses)..where((e) => e.id.equals(id)))
         .getSingle();
   }

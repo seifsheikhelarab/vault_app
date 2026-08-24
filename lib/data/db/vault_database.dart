@@ -27,8 +27,8 @@ class Categories extends Table {
 /// reserved for the recurring-source badge.
 ///
 /// `updatedAt`/`deletedAt` mirror the `/api/sync/push` whole-row LWW
-/// payload; a pulled tombstone removes the local row outright so live-only
-/// queries need no filter.
+/// payload: edits bump `updatedAt`, deletions stage a `deletedAt` tombstone
+/// that is pushed, then the row is removed once the server accepts.
 @DataClassName('ExpenseRow')
 class Expenses extends Table {
   TextColumn get id => text()();
@@ -42,6 +42,7 @@ class Expenses extends Table {
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
