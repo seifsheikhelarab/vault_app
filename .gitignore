@@ -46,3 +46,14 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Release signing — never commit
+key.properties
+*.jks
+*.keystore
+
+# Flutter ephemeral build artifacts (regenerated per platform tool)
+**/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m

@@ -15,6 +15,17 @@ final syncEngineProvider = FutureProvider<SyncEngine>((ref) async {
   );
 });
 
+/// Latest sync-cycle outcome, for the quiet "not synced" indicator.
+class SyncStatusNotifier extends Notifier<SyncStatus?> {
+  @override
+  SyncStatus? build() => null;
+
+  void set(SyncStatus status) => state = status;
+}
+
+final syncStatusProvider =
+    NotifierProvider<SyncStatusNotifier, SyncStatus?>(SyncStatusNotifier.new);
+
 /// Fan-in point for every sync trigger. Mutations land here debounced;
 /// manual pull-to-refresh awaits [refresh] directly.
 class SyncScheduler {
@@ -41,8 +52,10 @@ class SyncScheduler {
 }
 
 final syncSchedulerProvider = FutureProvider<SyncScheduler>((ref) async {
-  final scheduler = SyncScheduler(await ref.watch(syncEngineProvider.future));
+  final engine = await ref.watch(syncEngineProvider.future);
+  final scheduler = SyncScheduler(engine);
   ref.onDispose(scheduler.dispose);
+  engine.onStatus = ref.read(syncStatusProvider.notifier).set;
 
   // App-launch trigger: first resolution as signed-in kicks off a cycle.
   // Connectivity regain: false -> true edge while the stream runs.

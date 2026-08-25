@@ -8,24 +8,25 @@ Everything needed to build the Flutter app against this backend. Verified agains
 - **No CORS middleware** — irrelevant for native Dart HTTP, fatal if you ever fetch cross-origin from a webview.
 - Rate limits per IP per minute: `/api/auth/*` and `/api/chat/*` → **10** (they share one bucket), everything else → **120**. Success responses carry `X-RateLimit-Limit` / `X-RateLimit-Remaining`. Over limit → `429`.
 
-## 2. Authentication — cookie jar required
+## 2. Authentication — bearer token
 
-Better Auth v1.7, email/password only. **Cookie-only sessions; there is NO bearer/JWT support.** The server reads the session exclusively from the `Cookie` header.
+Better Auth v1.7, email/password only, with the **bearer plugin** enabled. The server accepts the session as either a cookie (web clients) or an `Authorization: Bearer <token>` header — the Flutter app uses the bearer form exclusively.
 
 Flutter requirements:
 
-1. Maintain your own cookie jar. On sign-up/sign-in capture every `set-cookie`; persist the `better-auth.session_token` value (secure storage) and send it verbatim as `Cookie:` on **every** subsequent request.
-2. Send `Content-Type: application/json` on POSTs.
-3. Auth endpoint error bodies are Better Auth's own JSON, NOT the app envelope below. Rely on status codes there.
-4. Sign-up seeds 8 default categories automatically (Groceries, Transport, Dining, Entertainment, Bills, Health, Shopping, Other).
+1. On sign-up/sign-in read the session token from the `set-auth-token` response header and persist it in secure storage. Send it as `Authorization: Bearer <token>` on **every** subsequent request.
+2. Token rotation: whenever the server rotates the session (e.g. after `change-password`), the fresh token arrives in `set-auth-token` again — capture it on **any** response, not just auth endpoints.
+3. Send `Content-Type: application/json` on POSTs.
+4. Auth endpoint error bodies are Better Auth's own JSON, NOT the app envelope below. Rely on status codes there.
+5. Sign-up seeds 8 default categories automatically (Groceries, Transport, Dining, Entertainment, Bills, Health, Shopping, Other).
 
 | Endpoint                    | Method | Request                                                        | Success                                                                                                        |
 | --------------------------- | ------ | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `/api/auth/sign-up/email`   | POST   | `{ "name", "email", "password" }` (password ≥ 8)               | `200`, `{ "user": { id, name, email, emailVerified, createdAt, updatedAt } }` + session cookie                 |
-| `/api/auth/sign-in/email`   | POST   | `{ "email", "password" }`                                      | `200` + session cookie. Bad credentials or unknown email both → `401`                                          |
-| `/api/auth/get-session`     | GET    | cookie                                                         | `200`, `{ "session": {...}, "user": {...} }`; **body is literal `null` when unauthenticated** (still HTTP 200) |
-| `/api/auth/sign-out`        | POST   | cookie                                                         | `200`, clears session                                                                                          |
-| `/api/auth/change-password` | POST   | `{ "currentPassword", "newPassword", "revokeOtherSessions"? }` | `200`, rotates cookie                                                                                          |
+| `/api/auth/sign-up/email`   | POST   | `{ "name", "email", "password" }` (password ≥ 8)               | `200`, `{ "user": {...} }` + `set-auth-token` header                                                           |
+| `/api/auth/sign-in/email`   | POST   | `{ "email", "password" }`                                      | `200` + `set-auth-token`. Bad credentials or unknown email both → `401`                                        |
+| `/api/auth/get-session`     | GET    | bearer token                                                   | `200`, `{ "session": {...}, "user": {...} }`; **body is literal `null` when unauthenticated** (still HTTP 200) |
+| `/api/auth/sign-out`        | POST   | bearer token                                                   | `200`, clears session                                                                                          |
+| `/api/auth/change-password` | POST   | `{ "currentPassword", "newPassword", "revokeOtherSessions"? }` | `200`, rotates token (`set-auth-token`)                                                                        |
 
 Not available: email verification, forgot-password, OAuth.
 
@@ -38,7 +39,7 @@ Not available: email verification, forgot-password, OAuth.
 | Status | code             | Typical messages                                                                                     |
 | ------ | ---------------- | ---------------------------------------------------------------------------------------------------- |
 | 400    | BAD_REQUEST      | Bad request                                                                                          |
-| 401    | UNAUTHORIZED     | Unauthorized (missing/expired cookie)                                                                |
+| 401    | UNAUTHORIZED     | Unauthorized (missing/expired token)                                                                 |
 | 404    | NOT_FOUND        | Not found                                                                                            |
 | 409    | CONFLICT         | `"Category already exists"`, `"Expense id already used with a different payload"`                    |
 | 422    | VALIDATION_ERROR | `"Invalid request"` + zod issues; also `"Invalid cursor"`, `"Unknown category <uuid> in sync batch"` |
@@ -248,12 +249,12 @@ Max 500 items per array; both arrays optional. Semantics:
 1. Local DB (Drift/Isar/sqlite). All writes go local first; queue mutations.
 2. Every expense gets client-minted UUID at creation → safe retries.
 3. Background sync worker: flush queue via `push`, then drain `pull` pages updating cursor.
-4. On 401 during sync: drop cookie, route to login, resume after re-auth.
+4. On 401 during sync: drop token, route to login, resume after re-auth.
 
 ## 12. Gaps the frontend must design around
 
 - No forgot-password / email verification / account deletion endpoints.
-- Session is a bare cookie value — store in `flutter_secure_storage`, never plaintext prefs.
+- Session token is a bearer credential — store in `flutter_secure_storage`, never plaintext prefs.
 - Category deletion doesn't reach other devices through sync.
 - Budgets/recurring require connectivity; only expenses+categories work offline end-to-end.
 - Rate limit: auth+chat share one 10/min bucket — don't fire chat requests right after login bursts.

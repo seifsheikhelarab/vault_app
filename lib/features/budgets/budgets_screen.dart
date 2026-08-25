@@ -76,6 +76,12 @@ class BudgetsScreen extends ConsumerWidget {
                           names[p.budget.categoryId] ?? 'Overall budget';
                       return Card(
                         clipBehavior: Clip.antiAlias,
+                        elevation: 0,
+                        color:
+                            Theme.of(context).colorScheme.surfaceContainerLow,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                         child: InkWell(
                           onTap: () => context.push('/budgets/${p.budget.id}'),
                           child: Padding(

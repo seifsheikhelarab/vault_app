@@ -16,7 +16,7 @@ Vault is an offline-first personal expense tracker backed by a hosted service. E
 
 ## Positioning
 
-Fully offline-capable expense tracking with natural-language capture ("lunch 120 with Ali" becomes a reviewable expense draft) in EGP, where competing trackers go inert or lossy without a connection.
+Fully offline-capable expense tracking in EGP, where competing trackers go inert or lossy without a connection. Logging an expense is the first thing the app offers: the opening tab is the capture form itself.
 
 ## Operating Context
 
@@ -27,13 +27,13 @@ Fully offline-capable expense tracking with natural-language capture ("lunch 120
 
 ## Capabilities and Constraints
 
-- Four tabs: Dashboard, Expenses, Chat, Settings.
+- Four tabs: Add expense (capture, first), Reports, Expenses, Settings.
 - Expenses and categories work completely offline (create/edit/delete queued locally, synced later).
-- Budgets, recurring rules, and Chat parsing are online-only writes; cached data stays visible offline with inline reasons blocking writes.
+- Budgets and recurring rules are online-only writes; cached data stays visible offline with inline reasons blocking writes.
 - Sync: push-then-pull cycles triggered by launch, connectivity regain, debounced mutations, and manual refresh; last-write-wins conflict resolution handled silently; category deletions reconcile locally by nulling references.
 - Money entry accepts strict two-decimal input; conversion to/from integer piasters lives in one shared helper.
 - New expenses carry client-minted UUID ids enabling idempotent retries.
-- Backend contract is verified and documented at repo root (`flutter-client.md`); auth is cookie-session based.
+- Backend contract is verified and documented at repo root (`flutter-client.md`); auth uses Better Auth bearer tokens (see `flutter-client.md`).
 - Undecided product fact: monetization/pricing has not been discussed or decided.
 
 ## Brand Commitments

@@ -6,9 +6,12 @@ import '../../core/format/date_labels.dart';
 import '../../core/money/money.dart';
 import '../../core/stream/latest_all.dart';
 import '../../core/ui/empty_state.dart';
+import '../../core/ui/paint.dart';
 import '../../data/db/vault_database.dart';
 import '../../data/providers.dart';
 import '../budgets/budget_providers.dart';
+import '../recurring/recurring_providers.dart';
+import '../reports/reports_screen.dart';
 
 /// Everything the dashboard renders, computed purely from the local DB.
 class DashboardData {
@@ -107,158 +110,275 @@ class _DashboardContent extends ConsumerWidget {
     final progress = ref.watch(budgetProgressProvider);
     final categories = ref.watch(categoriesListProvider).value ?? const [];
     final names = {for (final c in categories) c.id: c.name};
+    final recurrings = ref.watch(recurringListProvider).value;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 96),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 160),
       children: [
-        Text(
-          'This month',
-          style: theme.textTheme.labelLarge
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        // The painted wall: month state committed to one full-bleed field.
+        // Literal field teal in both brightnesses — the committed field
+        // never pales to a derived dark-mode tint.
+        ScoredPanel(
+          color: VaultColors.fieldSeed,
+          slope: 16,
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              RegistrationLabel('This month',
+                  color: Colors.white.withValues(alpha: 0.85)),
+              const SizedBox(height: 8),
+              MoneyMass(
+                data.monthTotals.current,
+                size: 64,
+                color: Colors.white,
+              ),
+              const SizedBox(height: 6),
+              _DeltaLabel(
+                current: data.monthTotals.current,
+                previous: data.monthTotals.previous,
+                color: Colors.white.withValues(alpha: 0.8),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          formatEgp(data.monthTotals.current),
-          style: theme.textTheme.displaySmall
-              ?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 4),
-        _DeltaLabel(current: data.monthTotals.current, previous: data.monthTotals.previous),
-        const SizedBox(height: 16),
-        Card(
-          elevation: 0,
-          color: theme.colorScheme.surfaceContainerLowest,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'This week',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  formatEgp(data.weekTotals.current),
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 4),
-                _DeltaLabel(
-                    current: data.weekTotals.current,
-                    previous: data.weekTotals.previous),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Card(
-          elevation: 0,
-          color: theme.colorScheme.surfaceContainerLowest,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          margin: EdgeInsets.zero,
-          child: ListTile(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            leading: Icon(Icons.bar_chart_outlined,
-                color: theme.colorScheme.onSurfaceVariant),
-            title: const Text('Reports'),
-            subtitle: Text('Charts over your spending',
-                style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
-            trailing: Icon(Icons.chevron_right,
-                color: theme.colorScheme.onSurfaceVariant),
-            onTap: () => context.push('/reports'),
-          ),
-        ),
-        const SizedBox(height: 24),
-        TextButton.icon(
-          onPressed: () => context.push('/budgets'),
-          icon: const Icon(Icons.savings_outlined),
-          label: const Text('Manage budgets'),
-        ),
-        if (progress.isNotEmpty) ...[
-          Text(
-            'Budgets',
-            style: theme.textTheme.labelLarge
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 8),
-          for (final p in progress)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: () => context.push('/budgets/${p.budget.id}'),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            p.budget.categoryId == null
-                                ? 'Overall'
-                                : names[p.budget.categoryId] ?? 'Category',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${formatEgp(p.spent)} / ${formatEgp(p.limitMinor)}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
+                    RegistrationLabel('This week'),
                     const SizedBox(height: 6),
-                    LinearProgressIndicator(
-                      value: p.ratio,
-                      minHeight: 8,
-                      borderRadius: BorderRadius.circular(4),
+                    Text(
+                      formatEgp(data.weekTotals.current),
+                      style: theme.textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 2),
+                    _DeltaLabel(
+                      current: data.weekTotals.current,
+                      previous: data.weekTotals.previous,
                     ),
                   ],
                 ),
               ),
-            ),
-          const SizedBox(height: 8),
-        ],
-        if (data.recent.isNotEmpty) ...[
-          Text(
-            'Recent expenses',
-            style: theme.textTheme.labelLarge
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          for (final (expense, category) in data.recent)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(category ?? 'Uncategorized'),
-              subtitle: Text(_formatDay(expense.occurredAt),
-                  style:
-                      TextStyle(color: theme.colorScheme.onSurfaceVariant)),
-              trailing: Text(
-                formatEgp(expense.amountMinor),
-                style: theme.textTheme.titleMedium,
+              const SizedBox(height: 12),
+              // Reports live on the dashboard: breakdown and trend inline.
+              ReportsPanel(scrollable: false),
+              const SizedBox(height: 20),
+              if (progress.isNotEmpty) ...[
+                Row(
+                  children: [
+                    Expanded(child: RegistrationLabel('Budgets')),
+                    TextButton(
+                      onPressed: () => context.push('/budgets'),
+                      child: const Text('Manage'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                for (final p in progress)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => context.push('/budgets/${p.budget.id}'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CategorySwatch(categoryId: p.budget.categoryId, size: 12),
+                              Expanded(
+                                child: Text(
+                                  p.budget.categoryId == null
+                                      ? 'Overall'
+                                      : names[p.budget.categoryId] ?? 'Category',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleSmall,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${formatEgp(p.spent)} / ${formatEgp(p.limitMinor)}',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            // The bar wears the category tone — color as
+                            // data, same rotation the pie and swatches use.
+                            child: LinearProgressIndicator(
+                              value: p.ratio,
+                              minHeight: 8,
+                              color: categoryTone(
+                                  p.budget.categoryId, theme.colorScheme),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+              ],
+              // Committed future spend: recurring rules glanceable beside the
+              // budgets they feed. Section stays visible when empty so the
+              // entry point never disappears.
+              Row(
+                children: [
+                  const Expanded(child: RegistrationLabel('Recurring payments')),
+                  TextButton(
+                    onPressed: () => context.push('/recurring'),
+                    child: const Text('Manage'),
+                  ),
+                ],
               ),
-            ),
-        ],
+              if (recurrings == null || recurrings.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Text(
+                    'No recurring payments yet.',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                )
+              else ...[
+                const SizedBox(height: 4),
+                for (final r in recurrings)
+                  _RecurringStrip(rule: r, categoryName: names[r.categoryId]),
+              ],
+              if (data.recent.isNotEmpty) ...[
+                RegistrationLabel('Recent expenses'),
+                const SizedBox(height: 4),
+                for (final (expense, category) in data.recent)
+                  _RecentStrip(expense: expense, category: category),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }
 }
 
+class _RecentStrip extends StatelessWidget {
+  const _RecentStrip({required this.expense, required this.category});
+
+  final ExpenseRow expense;
+  final String? category;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          CategorySwatch(categoryId: expense.categoryId, size: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(category ?? 'Uncategorized',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall),
+                Text(_formatDay(expense.occurredAt),
+                    style: theme.textTheme.labelMedium
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(formatEgp(expense.amountMinor), style: theme.textTheme.titleMedium),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecurringStrip extends StatelessWidget {
+  const _RecurringStrip({required this.rule, this.categoryName});
+
+  final RecurringRow rule;
+  final String? categoryName;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cadence = switch (rule.frequency) {
+      'daily' => rule.interval == 1 ? 'Daily' : 'Every ${rule.interval} days',
+      'weekly' =>
+        rule.interval == 1 ? 'Weekly' : 'Every ${rule.interval} weeks',
+      _ => rule.interval == 1 ? 'Monthly' : 'Every ${rule.interval} months',
+    };
+    // Paused rules are not coming; the whole strip recedes.
+    final tone = rule.paused
+        ? theme.colorScheme.onSurfaceVariant
+        : theme.colorScheme.onSurface;
+    final subtitle = rule.paused
+        ? 'Paused · $cadence'
+        : '$cadence · next ${_formatDay(rule.nextRunAt)}';
+    return Opacity(
+      opacity: rule.paused ? 0.6 : 1,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            CategorySwatch(categoryId: rule.categoryId, size: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(rule.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(color: tone)),
+                  Text(subtitle,
+                      style: theme.textTheme.labelMedium
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(formatEgp(rule.amountMinor),
+                style: theme.textTheme.titleMedium?.copyWith(color: tone)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DeltaLabel extends StatelessWidget {
-  const _DeltaLabel({required this.current, required this.previous});
+  const _DeltaLabel({
+    required this.current,
+    required this.previous,
+    this.color,
+  });
 
   final int current;
   final int previous;
 
+  /// Overrides the muted default when the label sits on the teal wall.
+  final Color? color;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final tone = color ?? scheme.onSurfaceVariant;
     final delta = current - previous;
     IconData icon;
     String label;
@@ -281,14 +401,14 @@ class _DeltaLabel extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: scheme.onSurfaceVariant),
+        Icon(icon, size: 16, color: tone),
         const SizedBox(width: 4),
         Text(
           label,
           style: Theme.of(context)
               .textTheme
               .bodyMedium
-              ?.copyWith(color: scheme.onSurfaceVariant),
+              ?.copyWith(color: tone),
         ),
       ],
     );

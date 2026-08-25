@@ -8,6 +8,7 @@ import '../../core/format/date_labels.dart';
 import '../../core/money/money.dart';
 import '../../core/stream/latest_all.dart';
 import '../../core/ui/empty_state.dart';
+import '../../core/ui/paint.dart';
 import '../../data/db/vault_database.dart';
 import '../../data/providers.dart';
 
@@ -68,62 +69,107 @@ final _reportsProvider =
   );
 });
 
-class ReportsScreen extends ConsumerStatefulWidget {
+class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
 
   @override
-  ConsumerState<ReportsScreen> createState() => _ReportsScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Reports')),
+      body: SafeArea(
+        child: ReportsPanel(),
+      ),
+    );
+  }
 }
 
-class _ReportsScreenState extends ConsumerState<ReportsScreen> {
+/// The full reports body — window toggle, category breakdown, daily trend.
+/// Embeddable: the dashboard hosts it directly (scrollable: false), the
+/// /reports route wraps it in a Scaffold.
+class ReportsPanel extends ConsumerStatefulWidget {
+  const ReportsPanel({this.scrollable = true, super.key});
+
+  /// True inside the /reports route (fills remaining height); false when
+  /// embedded in a scrolling parent like the dashboard.
+  final bool scrollable;
+
+  @override
+  ConsumerState<ReportsPanel> createState() => _ReportsPanelState();
+}
+
+class _ReportsPanelState extends ConsumerState<ReportsPanel> {
   ReportsWindow _window = ReportsWindow.week;
 
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(_reportsProvider(_window));
-    return Scaffold(
-      appBar: AppBar(title: const Text('Reports')),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-              child: SegmentedButton<ReportsWindow>(
-                segments: const [
-                  ButtonSegment(value: ReportsWindow.week, label: Text('Week')),
-                  ButtonSegment(
-                      value: ReportsWindow.month, label: Text('Month')),
-                ],
-                selected: {_window},
-                onSelectionChanged: (selection) =>
-                    setState(() => _window = selection.first),
-              ),
-            ),
-            Expanded(
-              child: async.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
-                error: (_, _) => const EmptyState(
-                  icon: Icons.error_outline,
-                  title: 'Reports unavailable',
-                  message:
-                      'Charts could not be read from the local ledger. Try again after restarting the app.',
-                ),
-                data: (data) => data.total == 0
-                    ? EmptyState(
-                        icon: Icons.pie_chart_outline_rounded,
-                        title: 'No spending '
-                            '${_window == ReportsWindow.week ? 'this week' : 'this month'}',
-                        message:
-                            'Breakdowns and trends appear here once expenses land in this window. Capture starts with the ember button.',
-                      )
-                    : _ReportsContent(data: data, window: _window),
-              ),
-            ),
-          ],
-        ),
+    final embedded = !widget.scrollable;
+    final content = async.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(child: CircularProgressIndicator()),
       ),
+      error: (_, _) => const EmptyState(
+        icon: Icons.error_outline,
+        title: 'Reports unavailable',
+        message:
+            'Charts could not be read from the local ledger. Try again after restarting the app.',
+      ),
+      data: (data) => data.total == 0
+          ? EmptyState(
+              icon: Icons.pie_chart_outline_rounded,
+              title: 'No spending '
+                  '${_window == ReportsWindow.week ? 'this week' : 'this month'}',
+              message:
+                  'Breakdowns and trends appear here once expenses land in this window. Capture starts with the ember button.',
+            )
+          : _ReportsContent(
+              data: data,
+              window: _window,
+              shrinkWrap: embedded,
+            ),
+    );
+    if (embedded) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
+            child: SegmentedButton<ReportsWindow>(
+              segments: const [
+                ButtonSegment(
+                    value: ReportsWindow.week, label: Text('Week')),
+                ButtonSegment(
+                    value: ReportsWindow.month, label: Text('Month')),
+              ],
+              selected: {_window},
+              onSelectionChanged: (selection) =>
+                  setState(() => _window = selection.first),
+            ),
+          ),
+          content,
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+          child: SegmentedButton<ReportsWindow>(
+            segments: const [
+              ButtonSegment(value: ReportsWindow.week, label: Text('Week')),
+              ButtonSegment(
+                  value: ReportsWindow.month, label: Text('Month')),
+            ],
+            selected: {_window},
+            onSelectionChanged: (selection) =>
+                setState(() => _window = selection.first),
+          ),
+        ),
+        Expanded(child: content),
+      ],
     );
   }
 }
@@ -138,21 +184,13 @@ class _Slice {
   final Color color;
 }
 
-/// Slice palette drawn only from scheme roles; uncategorized stays neutral
-/// (`outline`) so unbucketed spend reads differently by construction.
+/// Slice tones come from the shared [categoryTone] rotation so a category
+/// reads as one paint dab everywhere — list swatches, pie, and legend.
+/// Uncategorized abstains to neutral (`outline`) by construction.
 List<_Slice> _buildSlices(
     List<MapEntry<String?, int>> entries,
     Map<String, String> categoryNames,
     ColorScheme scheme) {
-  final palette = [
-    scheme.primary,
-    scheme.tertiary,
-    scheme.primaryContainer,
-    scheme.secondaryContainer,
-    scheme.tertiaryContainer,
-    scheme.onSurfaceVariant,
-  ];
-  var paletteIndex = 0;
   return [
     for (final entry in entries)
       _Slice(
@@ -160,16 +198,23 @@ List<_Slice> _buildSlices(
             ? 'Uncategorized'
             : categoryNames[entry.key] ?? 'Uncategorized',
         entry.value,
-        entry.key == null ? scheme.outline : palette[paletteIndex++ % palette.length],
+        categoryTone(entry.key, scheme),
       ),
   ];
 }
 
 class _ReportsContent extends ConsumerWidget {
-  const _ReportsContent({required this.data, required this.window});
+  const _ReportsContent({
+    required this.data,
+    required this.window,
+    this.shrinkWrap = false,
+  });
 
   final _ReportsData data;
   final ReportsWindow window;
+
+  /// Embedded mode: shrink-wrap into a scrolling parent, no own padding.
+  final bool shrinkWrap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -184,7 +229,11 @@ class _ReportsContent extends ConsumerWidget {
     final slices =
         _buildSlices(sorted, categoryNames, theme.colorScheme);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 96),
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+      padding: shrinkWrap
+          ? EdgeInsets.zero
+          : const EdgeInsets.fromLTRB(24, 0, 24, 96),
       children: [
         _ChartCard(
           title: 'Spend by category',
@@ -215,27 +264,24 @@ class _ChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerLowest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: theme.textTheme.labelLarge
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RegistrationLabel(title),
+          const SizedBox(height: 16),
+          child,
+          if (footer != null) ...[
             const SizedBox(height: 16),
-            child,
-            if (footer != null) ...[
-              const SizedBox(height: 16),
-              footer!,
-            ],
+            footer!,
           ],
-        ),
+        ],
       ),
     );
   }

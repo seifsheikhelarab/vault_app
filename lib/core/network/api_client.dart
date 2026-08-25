@@ -27,34 +27,6 @@ class ApiException implements Exception {
   String toString() => 'ApiException($statusCode)';
 }
 
-/// Expense DRAFT returned by `/api/chat/parse`. The server saves nothing;
-/// the client turns it into a real expense via its own POST.
-class ParsedDraft {
-  ParsedDraft({
-    required this.amountMinor,
-    required this.categoryGuess,
-    required this.categoryId,
-    required this.occurredAtGuess,
-    required this.note,
-  });
-
-  final int amountMinor;
-  final String? categoryGuess;
-  final String? categoryId;
-
-  /// Bare date (`YYYY-MM-DD`) resolved in the user's timezone.
-  final String occurredAtGuess;
-  final String? note;
-
-  factory ParsedDraft.fromJson(Map<String, dynamic> json) => ParsedDraft(
-        amountMinor: (json['amountMinor'] as num).toInt(),
-        categoryGuess: json['categoryGuess'] as String?,
-        categoryId: json['categoryId'] as String?,
-        occurredAtGuess: json['occurredAtGuess'] as String,
-        note: json['note'] as String?,
-      );
-}
-
 /// One page of the incremental `/api/sync/pull` delta. Both tables share a
 /// watermark; tombstoned expenses are included, categories never are.
 class SyncPullPage {
@@ -81,9 +53,11 @@ class SyncPushResult {
   final String outcome;
 }
 
-/// Thin client for the Vault API. Owns the cookie jar: persists
-/// `better-auth.session_token` in secure storage and replays it verbatim as
-/// the `Cookie:` header on every request (the server has no bearer support).
+/// Thin client for the Vault API. Owns the session token: persists the
+/// Better Auth token in secure storage and replays it as
+/// `Authorization: Bearer` on every request (server runs the Better Auth
+/// bearer plugin). Rotated tokens arrive in the `set-auth-token` response
+/// header and are captured automatically.
 class ApiClient {
   ApiClient({http.Client? client, FlutterSecureStorage? storage})
       : _client = client ?? http.Client(),
@@ -91,6 +65,12 @@ class ApiClient {
 
   final http.Client _client;
   final FlutterSecureStorage _storage;
+
+  /// Called after a protected route answers `401` (stored session revoked or
+  /// expired): the token is already cleared by then. Attach a listener to
+  /// bounce the user to sign-in. Never fires for `/api/auth/*` routes, where
+  /// `401` just means rejected credentials.
+  void Function()? onUnauthorized;
 
   Future<String?> readToken() => _storage.read(key: _tokenKey);
 
@@ -106,22 +86,30 @@ class ApiClient {
     final token = await readToken();
     return {
       'Content-Type': 'application/json',
-      if (token != null) 'Cookie': '$_tokenKey=$token',
+      if (token != null) 'Authorization': 'Bearer $token',
     };
   }
 
-  /// Capture the session cookie from an auth response into secure storage.
-  /// Awaited by [_send] so a rotated token (e.g. after change-password) is
-  /// durably persisted before the caller can fire another request.
-  Future<void> _captureCookie(http.Response res) async {
-    final raw = res.headers['set-cookie'];
-    if (raw == null) return;
-    final match =
-        RegExp('${RegExp.escape(_tokenKey)}=([^;]+)').firstMatch(raw);
-    final value = match?.group(1);
-    if (value != null && value.isNotEmpty) {
-      await _storage.write(key: _tokenKey, value: value);
+  /// Persist a freshly minted or rotated session token from the
+  /// `set-auth-token` response header (emitted by the server's Better Auth
+  /// bearer plugin on sign-up/sign-in and whenever the session rotates, e.g.
+  /// after change-password). Awaited by every request helper so the fresh
+  /// token is durably stored before the caller can fire another request.
+  Future<void> _captureToken(http.Response res) async {
+    final token = res.headers['set-auth-token'];
+    if (token != null && token.isNotEmpty) {
+      await _storage.write(key: _tokenKey, value: token);
     }
+  }
+
+  /// A `401` from a protected route means the stored session is dead:
+  /// clear it immediately and notify [onUnauthorized] so the app can
+  /// redirect. Auth-route `401`s (bad password, wrong current password)
+  /// leave the stored token alone — the caller surfaces the error instead.
+  Future<void> _handleUnauthorized(Uri uri, http.Response res) async {
+    if (res.statusCode != 401 || uri.path.startsWith('/api/auth/')) return;
+    await clearToken();
+    onUnauthorized?.call();
   }
 
   /// `null` body and JSON `null` both mean "no payload".
@@ -130,27 +118,45 @@ class ApiClient {
     return jsonDecode(res.body) as Map<String, dynamic>?;
   }
 
+  /// Error bodies may be non-JSON (CDN/proxy HTML pages); callers only want
+  /// the envelope message when one exists.
+  Map<String, dynamic>? _decodeErrorBody(http.Response res) {
+    try {
+      return _decodeBody(res);
+    } catch (_) {
+      return null;
+    }
+  }
+
   String? _envelopeMessage(Map<String, dynamic>? body) =>
       body?['error'] is Map<String, dynamic>
           ? (body!['error'] as Map<String, dynamic>)['message'] as String?
           : null;
 
-  Future<http.Response> _get(Uri uri, Map<String, String> headers) =>
-      _client.get(uri, headers: headers).timeout(_timeout);
+  Future<http.Response> _get(Uri uri, Map<String, String> headers) async {
+    final res = await _client.get(uri, headers: headers).timeout(_timeout);
+    await _captureToken(res);
+    await _handleUnauthorized(uri, res);
+    return res;
+  }
 
   Future<http.Response> _post(
     Uri uri,
     Map<String, String> headers, {
     Object? body,
-  }) =>
-      _client.post(uri, headers: headers, body: body).timeout(_timeout);
+  }) async {
+    final res =
+        await _client.post(uri, headers: headers, body: body).timeout(_timeout);
+    await _captureToken(res);
+    await _handleUnauthorized(uri, res);
+    return res;
+  }
 
   Future<void> _send(
     Future<http.Response> Function(Map<String, String> headers) fn,
   ) async {
     final res = await fn(await _headers());
     if (res.statusCode != 200) throw ApiException(res.statusCode);
-    await _captureCookie(res);
   }
 
   /// App-envelope routes: on failure parse `{ "error": { code, message } }`
@@ -179,15 +185,25 @@ class ApiClient {
   Future<http.Response> _delete(
     Uri uri,
     Map<String, String> headers,
-  ) =>
-      _client.delete(uri, headers: headers).timeout(_timeout);
+  ) async {
+    final res = await _client.delete(uri, headers: headers).timeout(_timeout);
+    await _captureToken(res);
+    await _handleUnauthorized(uri, res);
+    return res;
+  }
 
   Future<http.Response> _patch(
     Uri uri,
     Map<String, String> headers, {
     Object? body,
-  }) =>
-      _client.patch(uri, headers: headers, body: body).timeout(_timeout);
+  }) async {
+    final res = await _client
+        .patch(uri, headers: headers, body: body)
+        .timeout(_timeout);
+    await _captureToken(res);
+    await _handleUnauthorized(uri, res);
+    return res;
+  }
 
   // ── Budgets (/api/budgets — online-only, hard delete) ─────────────────
 
@@ -339,9 +355,10 @@ class ApiClient {
     return _send((h) => _post(_uri('/api/auth/sign-out'), h));
   }
 
-  /// `POST /api/auth/change-password` — rotates the session cookie. The
-  /// rotated token is captured into secure storage (awaited) before this
-  /// returns, so every later request already carries the fresh session.
+  /// `POST /api/auth/change-password` — rotates the session token. The
+  /// rotated token is captured from the `set-auth-token` header (awaited)
+  /// before this returns, so every later request already carries the fresh
+  /// session.
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -363,25 +380,14 @@ class ApiClient {
   Future<Map<String, dynamic>?> getSession() async {
     final res = await _get(_uri('/api/auth/get-session'),
         await _headers()..remove('Content-Type'));
-    if (res.statusCode == 401) return null;
+    if (res.statusCode == 401) {
+      // Auth-route 401s skip _handleUnauthorized's auto-clear; an expired
+      // boot session should still drop the dead token immediately.
+      await clearToken();
+      return null;
+    }
     if (res.statusCode != 200) throw ApiException(res.statusCode);
     return _decodeBody(res);
-  }
-
-  /// `POST /api/chat/parse` — natural-language phrase in, one expense draft
-  /// out. Nothing is persisted server-side. Errors: 502 parser failed,
-  /// 422 validation, 429 rate limited (shares the auth bucket).
-  Future<ParsedDraft> parseExpense(String message) async {
-    final res = await _post(
-      _uri('/api/chat/parse'),
-      await _headers(),
-      body: jsonEncode({'message': message}),
-    );
-    final body = _decodeBody(res);
-    if (res.statusCode != 200) {
-      throw ApiException(res.statusCode, message: _envelopeMessage(body));
-    }
-    return ParsedDraft.fromJson(body!);
   }
 
   /// `POST /api/expenses` — [id] MUST be a client-minted UUID so retries
@@ -405,7 +411,10 @@ class ApiClient {
       }),
     );
     if (res.statusCode != 200 && res.statusCode != 201) {
-      throw ApiException(res.statusCode, message: _envelopeMessage(_decodeBody(res)));
+      throw ApiException(
+        res.statusCode,
+        message: _envelopeMessage(_decodeErrorBody(res)),
+      );
     }
   }
 

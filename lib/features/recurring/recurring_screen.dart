@@ -25,7 +25,7 @@ class RecurringScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Recurring'),
+        title: const Text('Recurring payments'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -58,9 +58,9 @@ class RecurringScreen extends ConsumerWidget {
                         SizedBox(height: 160),
                         EmptyState(
                           icon: Icons.autorenew_outlined,
-                          title: 'No recurring rules yet',
+                          title: 'No recurring payments yet',
                           message:
-                              'Create a rule and the server logs the expense for you on schedule.',
+                              'Create a payment and the server logs the expense for you on schedule.',
                         ),
                       ],
                     ),
@@ -76,6 +76,12 @@ class RecurringScreen extends ConsumerWidget {
                       final r = list[i];
                       return Card(
                         clipBehavior: Clip.antiAlias,
+                        elevation: 0,
+                        color:
+                            Theme.of(context).colorScheme.surfaceContainerLow,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                         child: InkWell(
                           onTap: () => context.push('/recurring/${r.id}'),
                           child: Padding(

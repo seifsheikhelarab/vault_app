@@ -32,6 +32,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen>
 
   String? _validateName(String? value) {
     if (value == null || value.trim().isEmpty) return 'Enter your name';
+    if (value.trim().length > 100) return 'Name is too long';
     return null;
   }
 
@@ -68,6 +69,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen>
               decoration: const InputDecoration(labelText: 'Email'),
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
+              maxLength: 254,
               textInputAction: TextInputAction.next,
               validator: validateEmail,
             ),
@@ -76,6 +78,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen>
               controller: _password,
               decoration: const InputDecoration(labelText: 'Password'),
               obscureText: true,
+              maxLength: 128,
               textInputAction: TextInputAction.next,
               validator: validatePassword,
             ),
@@ -85,6 +88,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen>
               decoration:
                   const InputDecoration(labelText: 'Repeat the password'),
               obscureText: true,
+              maxLength: 128,
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => _submit(),
               validator: _validateConfirm,

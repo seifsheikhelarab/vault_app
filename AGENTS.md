@@ -6,7 +6,7 @@ Flutter client for Vault (expense tracker). The backend lives in a separate repo
 
 `flutter-client.md` at repo root is the verified API contract (Better Auth + Cloudflare Worker). Read it before writing any networking/API code. Highest-signal gotchas:
 
-- **Auth is cookie-only** (`better-auth.session_token`). No bearer/JWT. Store in `flutter_secure_storage`, send verbatim as `Cookie:` on every request.
+- **Auth is bearer-token** (`Authorization: Bearer <token>`, Better Auth bearer plugin). Server also accepts cookies for web clients, but this app uses bearer exclusively. Token arrives via `set-auth-token` response header, lives in `flutter_secure_storage`, and rotates on sign-in/change-password.
 - **Money**: integer minor units of EGP (piasters), JSON number, never string.
 - **Expenses require client-minted UUID `id`** on create — enables idempotent retries and offline sync dedupe.
 - Expenses/categories soft/hard delete semantics differ from budgets/recurring; only expenses+categories sync offline (`/api/sync`).

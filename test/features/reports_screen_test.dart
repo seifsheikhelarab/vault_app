@@ -116,7 +116,7 @@ void main() {
 
       await _pumpReports(tester, db);
 
-      expect(find.text('Daily trend'), findsOneWidget);
+      expect(find.text('DAILY TREND'), findsOneWidget);
       expect(find.byType(LineChart), findsOneWidget);
 
       await tester.tap(find.text('Month'));

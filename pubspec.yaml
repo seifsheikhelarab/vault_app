@@ -55,9 +55,18 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   drift_dev: ^2.34.5
   build_runner: ^2.16.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
+
+flutter_launcher_icons:
+  image_path: "assets/icon/wallet_legacy.png"
+  android: "launcher_icon"
+  min_sdk_android: 21
+  adaptive_icon_background: "#0E7C7B"
+  adaptive_icon_foreground: "assets/icon/wallet_foreground.png"
+  adaptive_icon_monochrome: "assets/icon/wallet_foreground.png"
 
 # The following section is specific to Flutter packages.
 flutter:
@@ -66,6 +75,11 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  fonts:
+    - family: Anton
+      fonts:
+        - asset: assets/fonts/Anton-Regular.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:

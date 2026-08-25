@@ -14,14 +14,43 @@ import 'sync/sync_providers.dart';
 
 /// Opens the on-disk database. Overridden with `NativeDatabase.memory()` in
 /// tests.
+///
+/// A corrupt file would otherwise fail this provider and brick every data
+/// screen, so open failures move the file aside and start fresh — synced
+/// rows return on the next full pull.
 final vaultDatabaseProvider = FutureProvider<VaultDatabase>((ref) async {
   final dir = await getApplicationSupportDirectory();
-  final db = VaultDatabase(
-    NativeDatabase.createInBackground(
-      File('${dir.path}${Platform.pathSeparator}vault.sqlite'),
-      setup: (raw) => raw.execute('PRAGMA foreign_keys = ON'),
-    ),
-  );
+  final dbFile = File('${dir.path}${Platform.pathSeparator}vault.sqlite');
+
+  Future<VaultDatabase> open() async {
+    final db = VaultDatabase(
+      NativeDatabase.createInBackground(
+        dbFile,
+        setup: (raw) {
+          raw.execute('PRAGMA foreign_keys = ON');
+          raw.execute('PRAGMA journal_mode = WAL');
+        },
+      ),
+    );
+    // Force a real table read now so corruption surfaces here, not mid-UI.
+    await db.select(db.categories).get();
+    return db;
+  }
+
+  VaultDatabase db;
+  try {
+    db = await open();
+  } catch (_) {
+    // ponytail: whole-file quarantine; per-page salvage if corruption ever
+    // recurs in the field.
+    for (final suffix in ['', '-wal', '-shm']) {
+      final source = File('${dbFile.path}$suffix');
+      final dead = File('${dbFile.path}$suffix.corrupt');
+      if (await dead.exists()) await dead.delete();
+      if (await source.exists()) await source.rename(dead.path);
+    }
+    db = await open();
+  }
   ref.onDispose(db.close);
   return db;
 });

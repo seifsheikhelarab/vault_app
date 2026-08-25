@@ -7,7 +7,7 @@ import 'package:http/testing.dart';
 import 'package:vault_app/core/network/api_client.dart';
 
 /// In-memory stand-in for secure storage; lets tests assert exactly what
-/// ApiClient persists (the rotated-cookie path especially).
+/// ApiClient persists (the rotated-token path especially).
 class _FakeStorage extends FlutterSecureStorage {
   final Map<String, String> values = {};
 
@@ -85,8 +85,7 @@ void main() {
         200,
         headers: {
           'content-type': 'application/json',
-          'set-cookie':
-              '$tokenKey=$newToken; Path=/; HttpOnly; SameSite=Lax',
+          'set-auth-token': newToken,
         },
       );
     });
@@ -95,14 +94,14 @@ void main() {
 
     // Request shape per contract.
     expect(captured!.url.path, '/api/auth/change-password');
-    expect(captured!.headers['cookie'], '$tokenKey=$oldToken');
+    expect(captured!.headers['authorization'], 'Bearer $oldToken');
     expect(jsonDecode(captured!.body), {
       'currentPassword': 'current-pass',
       'newPassword': 'new-password-123',
       'revokeOtherSessions': true,
     });
 
-    // The rotated cookie overwrote the stored one before the call returned.
+    // The rotated token overwrote the stored one before the call returned.
     expect(await api.readToken(), newToken);
   });
 

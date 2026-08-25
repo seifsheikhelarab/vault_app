@@ -152,14 +152,14 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('valid sign-in reaches the four-tab shell with capture FAB',
+  testWidgets('opens on the add-expense tab with the four-tab shell',
       (tester) async {
     await signIn(tester);
 
-    expect(find.text('Your month at a glance'), findsOneWidget);
+    // Capture is the first tab: the form is up immediately, no FAB needed.
+    expect(find.text('Log an expense'), findsOneWidget);
     expect(find.byType(NavigationBar), findsOneWidget);
-    expect(find.byType(FloatingActionButton), findsOneWidget);
-    for (final label in ['Dashboard', 'Expenses', 'Chat', 'Settings']) {
+    for (final label in ['Add expense', 'Reports', 'Expenses', 'Settings']) {
       expect(navLabel(label), findsOneWidget);
     }
     await unmount(tester);
@@ -172,9 +172,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Nothing logged yet'), findsOneWidget);
 
-    await tester.tap(navLabel('Chat'));
+    await tester.tap(navLabel('Reports'));
     await tester.pumpAndSettle();
-    expect(find.text('Turn words into an expense'), findsOneWidget);
+    expect(find.text('Your month at a glance'), findsOneWidget);
 
     await tester.tap(navLabel('Settings'));
     await tester.pumpAndSettle();
@@ -184,6 +184,27 @@ void main() {
         find.text('Sign out'), find.byType(ListView), const Offset(0, -250));
     await tester.pumpAndSettle();
     expect(find.text('Sign out'), findsOneWidget);
+    await unmount(tester);
+  });
+
+  testWidgets('capture tab saves offline and resets for the next one',
+      (tester) async {
+    await signIn(tester); // MockClient 404s every non-auth route.
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Amount'), '42');
+    await tester.tap(find.widgetWithText(FilledButton, 'Save expense'));
+    await tester.pumpAndSettle();
+
+    // Form cleared, ready for the next capture.
+    final amount = find.widgetWithText(TextFormField, 'Amount');
+    expect(amount, findsOneWidget);
+    expect(tester.widget<TextFormField>(amount).controller!.text, isEmpty);
+
+    // The expense exists locally despite zero successful network writes.
+    await tester.tap(navLabel('Expenses'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('42.00'), findsWidgets);
     await unmount(tester);
   });
 
@@ -197,6 +218,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
+    // Confirmation dialog guards the destructive action.
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign out'));
+    await tester.pumpAndSettle();
 
     expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);
     await unmount(tester);
@@ -205,6 +229,9 @@ void main() {
   testWidgets('capture FAB opens the log-an-expense sheet', (tester) async {
     await signIn(tester);
 
+    // The FAB rests on every tab except capture itself.
+    await tester.tap(navLabel('Reports'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(FloatingActionButton));
     await tester.pumpAndSettle();
 
@@ -220,6 +247,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.widgetWithText(FilledButton, 'Create account'), findsOneWidget);
 
+    // The taller sign-up form scrolls — bring the submit button into view.
+    await tester.ensureVisible(
+        find.widgetWithText(FilledButton, 'Create account'));
+    await tester.pumpAndSettle();
     await tester
         .tap(find.widgetWithText(FilledButton, 'Create account'));
     await tester.pumpAndSettle();

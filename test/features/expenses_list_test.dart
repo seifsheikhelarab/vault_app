@@ -64,8 +64,9 @@ void main() {
 
       await _pumpScreen(tester, db);
 
-      expect(find.text('Today'), findsOneWidget);
-      expect(find.text('Yesterday'), findsOneWidget);
+      // Day headers are registration furniture: tracked caps.
+      expect(find.text('TODAY'), findsOneWidget);
+      expect(find.text('YESTERDAY'), findsOneWidget);
       expect(_olderHeaderFinder, findsOneWidget);
       expect(find.text('EGP 125.00'), findsOneWidget); // coffee + lunch
       // Tile trailing amount and day-total header coincide when a day has
@@ -74,9 +75,9 @@ void main() {
       expect(find.text('EGP 125.50'), findsNWidgets(2)); // taxi
 
       // Newest-first ordering of the day headers.
-      expect(tester.getTopLeft(find.text('Today')).dy,
-          lessThan(tester.getTopLeft(find.text('Yesterday')).dy));
-      expect(tester.getTopLeft(find.text('Yesterday')).dy,
+      expect(tester.getTopLeft(find.text('TODAY')).dy,
+          lessThan(tester.getTopLeft(find.text('YESTERDAY')).dy));
+      expect(tester.getTopLeft(find.text('YESTERDAY')).dy,
           lessThan(tester.getTopLeft(_olderHeaderFinder).dy));
       await _unmount(tester);
   });

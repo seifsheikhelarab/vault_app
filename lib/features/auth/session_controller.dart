@@ -8,16 +8,19 @@ class SessionController extends AsyncNotifier<bool> {
   @override
   Future<bool> build() async {
     final api = ref.watch(apiClientProvider);
+    // Any protected route answering 401 later (revoked/expired session)
+    // drops the user back to sign-in through the router's redirect.
+    api.onUnauthorized = () => state = const AsyncData(false);
     final token = await api.readToken();
     if (token == null) return false;
     try {
       final session = await api.getSession();
       return session != null;
     } catch (_) {
-      // Dead or unreachable cookie at boot ⇒ treat as signed out.
-      // ponytail: collapses offline-with-valid-cookie into sign-in; revisit
-      // when offline mode lands and a cached identity matters.
-      return false;
+      // Boot-time network failure ≠ dead session: trust the stored token so
+      // an offline cold start stays in the app. If the token really is dead,
+      // the next request answers 401, clears it, and the router redirects.
+      return true;
     }
   }
 

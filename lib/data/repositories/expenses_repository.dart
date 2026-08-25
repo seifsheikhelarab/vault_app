@@ -40,28 +40,6 @@ class ExpensesRepository {
         .getSingle();
   }
 
-  /// Inserts a row the server already holds under [id] (chat confirm flow:
-  /// POST succeeds, then local insert). `pendingSync` stays false so the
-  /// sync engine never re-pushes it.
-  Future<void> createSynced({
-    required String id,
-    required int amountMinor,
-    String? categoryId,
-    required DateTime occurredAt,
-    String? note,
-  }) {
-    return _db.into(_db.expenses).insert(
-          ExpensesCompanion.insert(
-            id: id,
-            amountMinor: amountMinor,
-            categoryId: Value(categoryId),
-            occurredAt: occurredAt,
-            note: Value(note),
-            recurringId: const Value(null),
-          ),
-        );
-  }
-
   /// Stages an edit: the row is rewritten locally and marked dirty so the
   /// next sync cycle pushes it whole-row (LWW).
   Future<void> update({
@@ -104,7 +82,8 @@ class ExpensesRepository {
     String? categoryId,
     required int limit,
   }) {
-    final query = _db.select(_db.expenses);
+    final query = _db.select(_db.expenses)
+      ..where((e) => e.deletedAt.isNull());
     if (categoryId != null) {
       query.where((e) => e.categoryId.equals(categoryId));
     }
@@ -126,7 +105,8 @@ class ExpensesRepository {
     final query = _db.select(_db.expenses).join([
       leftOuterJoin(
           _db.categories, _db.categories.id.equalsExp(_db.expenses.categoryId)),
-    ]);
+    ])
+      ..where(_db.expenses.deletedAt.isNull());
     return (query
               ..orderBy([
                 OrderingTerm(
@@ -164,7 +144,7 @@ class ExpensesRepository {
       'THEN amount_minor END), 0) AS cur, '
       'COALESCE(SUM(CASE WHEN occurred_at >= ? AND occurred_at < ? '
       'THEN amount_minor END), 0) AS prev '
-      'FROM expenses',
+      'FROM expenses WHERE deleted_at IS NULL',
       variables: [
         Variable.withDateTime(windowStart),
         Variable.withDateTime(windowEnd),
@@ -184,7 +164,9 @@ class ExpensesRepository {
   /// Count of live rows, used to stop infinite scroll growth.
   Stream<int> watchCount({String? categoryId}) {
     final count = _db.expenses.id.count();
-    final query = _db.selectOnly(_db.expenses)..addColumns([count]);
+    final query = _db.selectOnly(_db.expenses)
+      ..addColumns([count])
+      ..where(_db.expenses.deletedAt.isNull());
     if (categoryId != null) {
       query.where(_db.expenses.categoryId.equals(categoryId));
     }
@@ -199,7 +181,8 @@ class ExpensesRepository {
     final query = _db.selectOnly(_db.expenses)
       ..addColumns([_db.expenses.categoryId, total])
       ..where(_db.expenses.occurredAt.isBiggerOrEqualValue(start) &
-          _db.expenses.occurredAt.isSmallerThanValue(end))
+          _db.expenses.occurredAt.isSmallerThanValue(end) &
+          _db.expenses.deletedAt.isNull())
       ..groupBy([_db.expenses.categoryId]);
     return query.watch().map((rows) => {
           for (final row in rows)
@@ -220,7 +203,7 @@ class ExpensesRepository {
       'SELECT CAST((occurred_at - ?) / 86400 AS INTEGER) AS day, '
       'SUM(amount_minor) AS total '
       'FROM expenses '
-      'WHERE occurred_at >= ? AND occurred_at < ? '
+      'WHERE occurred_at >= ? AND occurred_at < ? AND deleted_at IS NULL '
       'GROUP BY day',
       variables: [
         Variable.withInt(startEpochSeconds),

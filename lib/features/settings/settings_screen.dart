@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/connectivity_provider.dart';
+import '../../core/ui/paint.dart';
 import '../../data/sync/sync_providers.dart';
 import '../auth/auth_form.dart';
 import '../auth/session_controller.dart';
@@ -154,171 +154,264 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
   }
 
+  Future<void> _signOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text(
+          'You can sign back in anytime with your email and password.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await ref.read(sessionProvider.notifier).signOut();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final online = ref.watch(connectivityProvider).asData?.value ?? true;
 
     return Scaffold(
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        children: [
-          _SectionHeader('Account'),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-            child: Form(
-              key: _formKey,
-              autovalidateMode: AutovalidateMode.onUserInteraction,
+      body: SafeArea(
+        child: ListView(
+          // Bottom inset clears the navigation beam and the capture FAB.
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 160),
+          children: [
+            // The painted wall opens the tab: app identity registered on the
+            // committed field, the screen title its single typographic mass.
+            ScoredPanel(
+              color: VaultColors.fieldSeed,
+              slope: 16,
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextFormField(
-                    controller: _current,
-                    decoration:
-                        const InputDecoration(labelText: 'Current password'),
-                    obscureText: true,
-                    textInputAction: TextInputAction.next,
-                    validator: validatePassword,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _new,
-                    decoration:
-                        const InputDecoration(labelText: 'New password'),
-                    obscureText: true,
-                    textInputAction: TextInputAction.next,
-                    validator: validatePassword,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _confirm,
-                    decoration:
-                        const InputDecoration(labelText: 'Confirm new password'),
-                    obscureText: true,
-                    textInputAction: TextInputAction.done,
-                    validator: (value) =>
-                        value == _new.text ? null : 'Passwords do not match',
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Sign out other devices'),
-                    subtitle: const Text(
-                        'Revokes every session except this one.'),
-                    value: _revokeOtherSessions,
-                    onChanged: (value) =>
-                        setState(() => _revokeOtherSessions = value),
-                  ),
+                  RegistrationLabel('Vault',
+                      color: Colors.white.withValues(alpha: 0.85)),
                   const SizedBox(height: 8),
-                  AuthSubmitButton(
-                    label: 'Update password',
-                    busy: _changingPassword,
-                    onPressed: _submitChangePassword,
+                  Text(
+                    'Settings',
+                    style: theme.textTheme.headlineMedium
+                        ?.copyWith(color: Colors.white),
                   ),
-                  if (!online)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Row(
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const RegistrationLabel('Account'),
+                  const SizedBox(height: 8),
+                  _Slab(
+                    child: Form(
+                      key: _formKey,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      child: ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        childrenPadding:
+                            const EdgeInsets.symmetric(vertical: 8),
+                        title: const Text('Change password'),
+                        subtitle: const Text(
+                            'Updates the password for every Vault sign-in.'),
                         children: [
-                          Icon(Icons.wifi_off,
-                              size: 16, color: scheme.onSurfaceVariant),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Changing your password needs a connection.',
-                              style: TextStyle(color: scheme.onSurfaceVariant),
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              TextFormField(
+                                controller: _current,
+                                decoration: const InputDecoration(
+                                    labelText: 'Current password'),
+                                obscureText: true,
+                                textInputAction: TextInputAction.next,
+                                validator: validatePassword,
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: _new,
+                                decoration: const InputDecoration(
+                                    labelText: 'New password'),
+                                obscureText: true,
+                                textInputAction: TextInputAction.next,
+                                validator: validatePassword,
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: _confirm,
+                                decoration: const InputDecoration(
+                                    labelText: 'Confirm new password'),
+                                obscureText: true,
+                                textInputAction: TextInputAction.done,
+                                validator: (value) =>
+                                    value == _new.text
+                                        ? null
+                                        : 'Passwords do not match',
+                              ),
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('Sign out other devices'),
+                                subtitle: const Text(
+                                    'Revokes every session except this one.'),
+                                value: _revokeOtherSessions,
+                                onChanged: (value) => setState(
+                                    () => _revokeOtherSessions = value),
+                              ),
+                              const SizedBox(height: 8),
+                              AuthSubmitButton(
+                                label: 'Update password',
+                                busy: _changingPassword,
+                                onPressed: _submitChangePassword,
+                              ),
+                              if (!online)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.wifi_off,
+                                          size: 16,
+                                          color: scheme.onSurfaceVariant),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Changing your password needs a connection.',
+                                          style: TextStyle(
+                                              color:
+                                                  scheme.onSurfaceVariant),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (_passwordMessage != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: Text(
+                                    _passwordMessage!,
+                                    style: TextStyle(
+                                      color: _passwordError
+                                          ? scheme.error
+                                          : scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                  if (_passwordMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Text(
-                        _passwordMessage!,
-                        style: TextStyle(
-                          color: _passwordError
-                              ? scheme.error
-                              : scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 24),
+                  const RegistrationLabel('Data'),
+                  const SizedBox(height: 8),
+                  _Slab(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Force resync'),
+                          subtitle: const Text(
+                              'Clear local data and re-download everything from the server.'),
+                          trailing: _resyncing
+                              ? const SizedBox(
+                                  height: 22,
+                                  width: 22,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.4),
+                                )
+                              : Icon(Icons.sync, color: scheme.primary),
+                          onTap: _runResync,
                         ),
-                      ),
+                        if (_resyncOutcome != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              _resyncOutcome!,
+                              style: TextStyle(
+                                color: _resyncError
+                                    ? scheme.error
+                                    : scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
+                  ),
+                  const SizedBox(height: 24),
+                  const RegistrationLabel('About'),
+                  const SizedBox(height: 8),
+                  _Slab(
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Version'),
+                      trailing: ref.watch(_packageInfoProvider).maybeWhen(
+                            data: (info) => Text(
+                              '${info.version}+${info.buildNumber}',
+                              style:
+                                  TextStyle(color: scheme.onSurfaceVariant),
+                            ),
+                            orElse: () => Text(
+                              '…',
+                              style:
+                                  TextStyle(color: scheme.onSurfaceVariant),
+                            ),
+                          ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: TextButton(
+                      style:
+                          TextButton.styleFrom(foregroundColor: scheme.error),
+                      onPressed: _signOut,
+                      child: const Text('Sign out'),
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
-          _SectionHeader('Data'),
-          ListTile(
-            title: const Text('Force resync'),
-            subtitle: const Text(
-                'Clear local data and re-download everything from the server.'),
-            trailing: _resyncing
-                ? const SizedBox(
-                    height: 22,
-                    width: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2.4),
-                  )
-                : const Icon(Icons.sync),
-            onTap: _runResync,
-          ),
-          if (_resyncOutcome != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-              child: Text(
-                _resyncOutcome!,
-                style: TextStyle(
-                  color: _resyncError ? scheme.error : scheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          _SectionHeader('About'),
-          ListTile(
-            leading: const Icon(Icons.autorenew_outlined),
-            title: const Text('Recurring rules'),
-            trailing: Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
-            onTap: () => context.push('/recurring'),
-          ),
-          ListTile(
-            title: const Text('Version'),
-            trailing: ref.watch(_packageInfoProvider).maybeWhen(
-                  data: (info) => Text(
-                    '${info.version}+${info.buildNumber}',
-                    style: TextStyle(color: scheme.onSurfaceVariant),
-                  ),
-                  orElse: () => Text(
-                    '…',
-                    style: TextStyle(color: scheme.onSurfaceVariant),
-                  ),
-                ),
-          ),
-          ListTile(
-            title: Text(
-              'Sign out',
-              style: TextStyle(color: scheme.error),
-            ),
-            onTap: () => ref.read(sessionProvider.notifier).signOut(),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title);
+/// A painted slab of the wall: one flat panel joining sections along the
+/// ground, never a floating card. Shares the dashboard's container recipe.
+class _Slab extends StatelessWidget {
+  const _Slab({required this.child});
 
-  final String title;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-      child: Text(
-        title.toUpperCase(),
-        style: Theme.of(context)
-            .textTheme
-            .labelLarge
-            ?.copyWith(color: Theme.of(context).colorScheme.primary),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      // Transparent Material so tiles inside keep their ink splashes.
+      child: Material(
+        type: MaterialType.transparency,
+        child: child,
       ),
     );
   }

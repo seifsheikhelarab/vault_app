@@ -107,6 +107,23 @@ class VaultDatabase extends _$VaultDatabase {
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onUpgrade: (m, from, to) async {
+          if (to < from) {
+            // App rollback against a newer-schema file would misbehave at
+            // runtime; drop and recreate fresh. Synced rows return on the
+            // next sync cycle's full pull.
+            final db = m.database;
+            for (final name in [
+              'categories',
+              'expenses',
+              'budgets',
+              'recurrings',
+              'sync_state',
+            ]) {
+              await db.customStatement('DROP TABLE IF EXISTS $name');
+            }
+            await m.createAll();
+            return;
+          }
           if (from < 2) await m.createTable(budgets);
           if (from < 3) {
             await m.createTable(syncState);

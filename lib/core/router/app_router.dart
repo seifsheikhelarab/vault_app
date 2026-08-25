@@ -7,12 +7,11 @@ import '../../features/auth/sign_in_screen.dart';
 import '../../features/auth/sign_up_screen.dart';
 import '../../features/budgets/budget_editor_screen.dart';
 import '../../features/budgets/budgets_screen.dart';
-import '../../features/chat/chat_screen.dart';
+import '../../features/capture/capture_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/expenses/expenses_screen.dart';
 import '../../features/recurring/recurring_editor_screen.dart';
 import '../../features/recurring/recurring_screen.dart';
-import '../../features/reports/reports_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/shell/home_shell.dart';
 
@@ -22,17 +21,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
-    initialLocation: '/sign-in',
+    initialLocation: '/boot',
     refreshListenable: refresh,
     redirect: (context, state) {
       final session = ref.read(sessionProvider);
-      // Boot still deciding (stored cookie being validated): hold course so a
-      // cold-start deep link is not rewritten before the gate knows the answer.
+      // Boot still deciding: park on the splash so a cold start never
+      // flashes sign-in before the gate knows the answer.
       if (session.isLoading) return null;
 
       final loc = state.matchedLocation;
       final onAuth = loc == '/sign-in' || loc == '/sign-up';
       final authed = session.value ?? false;
+
+      if (loc == '/boot') return authed ? '/log' : '/sign-in';
 
       if (!authed) {
         if (onAuth) return null;
@@ -41,11 +42,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
       if (onAuth) {
         final from = state.uri.queryParameters['from'];
-        return (from != null && from.startsWith('/')) ? from : '/home';
+        return (from != null && from.startsWith('/')) ? from : '/log';
       }
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/boot',
+        builder: (_, _) => const _BootScreen(),
+      ),
       GoRoute(
         path: '/sign-in',
         builder: (_, _) => const SignInScreen(),
@@ -79,13 +84,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      GoRoute(
-        path: '/reports',
-        builder: (_, _) => const ReportsScreen(),
-      ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, shell) => HomeShell(shell: shell),
         branches: [
+          // Capture first: opening Vault lands on the log-an-expense form.
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/log',
+                builder: (_, _) => const CaptureScreen(),
+              ),
+            ],
+          ),
           StatefulShellBranch(
             routes: [
               GoRoute(
@@ -105,14 +115,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/chat',
-                builder: (_, _) => const ChatScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
                 path: '/settings',
                 builder: (_, _) => const SettingsScreen(),
               ),
@@ -123,3 +125,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+/// Shown only while the session gate is still resolving on cold start.
+class _BootScreen extends StatelessWidget {
+  const _BootScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Vault', style: theme.textTheme.headlineMedium),
+            const SizedBox(height: 16),
+            const CircularProgressIndicator(),
+          ],
+        ),
+      ),
+    );
+  }
+}

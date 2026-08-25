@@ -1,0 +1,153 @@
+{
+  "title": "Vault: choose the new visual world",
+  "question": "New world, colors pinned (teal 0E7C7B + ember E8562A stay law). The roll dealt Sign-Painter's Cairo. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Sign-Painter's Cairo",
+      "kicker": "THE ROLL",
+      "lineage": "hand-painted shop signs & cinema billboards of Cairo streets",
+      "thesis": "Every screen is a freshly painted wall — flat committed teal panels, monumental block-letter money, ember the single hot spot.",
+      "palette": ["#0E7C7B", "#E8562A", "#F4EFE6", "#1F1D1A"],
+      "materials": ["enamel color flats", "hand-blocked lettering", "scored panel seams"],
+      "viewport": "Dashboard opens on a committed teal wall carrying the month's total in monumental numerals; expenses sit below as flat painted strips, one voice each; the ember FAB alone burns.",
+      "risk": "Paint energy can crowd number-scanning — every strip must hold exactly one voice.",
+      "raised": [
+        {
+          "from": "Design Annual Plates",
+          "raise": "Tracked caps micro-labels act as registration furniture, quieting the paint around every figure."
+        },
+        {
+          "from": "Miura Fold",
+          "raise": "Sections join along scored diagonal seams, not plain gutters — crease discipline as structure."
+        },
+        {
+          "from": "Cracktro Queue",
+          "raise": "One display family at exactly two sizes: the monumental money mass, everything else yielded."
+        }
+      ],
+      "comp": ".impeccable/mocks/decision/assigned.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 14,
+        "regions": [
+          { "label": "teal painted wall · month total monumental", "x": 0, "y": 0, "w": 12, "h": 5, "accent": false },
+          { "label": "tracked caps label row", "x": 0, "y": 5, "w": 12, "h": 1 },
+          { "label": "expense strips, scored seams", "x": 0, "y": 6, "w": 12, "h": 6 },
+          { "label": "nav bar", "x": 0, "y": 12, "w": 12, "h": 2 },
+          { "label": "ember FAB", "x": 8, "y": 11, "w": 3, "h": 2, "accent": true }
+        ]
+      }
+    },
+    {
+      "id": "model-pick",
+      "label": "Khayamiya Patchwork",
+      "kicker": "IMPECCABLE'S PICK",
+      "lineage": "tentmaker appliqué of Sharia Khayamiya",
+      "thesis": "The dashboard is a sewn panel field — every stat and budget its own saturated cloth patch, stitch borders carrying structure.",
+      "palette": ["#0E7C7B", "#E8562A", "#27403C", "#EFE3CE"],
+      "materials": ["appliqué panels", "blanket stitch", "bias tape"],
+      "viewport": "Totals and budgets arrive as stitched patches of solid color; opening the app feels like unfolding a market awning, ember reserved for capture.",
+      "risk": "Pattern density is the honest risk — patches must never outshout the money figures.",
+      "comp": ".impeccable/mocks/decision/model-pick.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 14,
+        "regions": [
+          { "label": "stitched header patch · balance", "x": 0, "y": 0, "w": 12, "h": 4 },
+          { "label": "budget patch grid 2x2", "x": 0, "y": 4, "w": 12, "h": 5, "accent": false },
+          { "label": "recent strip patch", "x": 0, "y": 9, "w": 12, "h": 3 },
+          { "label": "nav bar", "x": 0, "y": 12, "w": 12, "h": 2 },
+          { "label": "ember FAB", "x": 8, "y": 10, "w": 3, "h": 2, "accent": true }
+        ]
+      }
+    },
+    {
+      "id": "challenger-oscilloscope",
+      "label": "Signal Bench",
+      "verdict": "competitive",
+      "lineage": "CRT oscilloscope on an engineer's bench",
+      "thesis": "Spending is a trace — teal waveform over an etched graticule, ember reserved for armed and warning readouts.",
+      "palette": ["#0A1514", "#0E7C7B", "#E8562A", "#9FB4AC"],
+      "materials": ["phosphor glass", "etched graticule", "detented knobs"],
+      "viewport": "Month view as a locked trace over ten divisions; knobs step timebase and category; seven-segment totals glow.",
+      "case": "Holds product clarity — numbers become instrument readouts; loses identification: Egyptians live on phones, not signal benches.",
+      "risk": "Instrument coolness reads cold for daily money care.",
+      "comp": ".impeccable/mocks/decision/challenger-oscilloscope.webp",
+      "hero": "https://impeccable.style/worlds/cards/scientific-notation-oscilloscope-signal-bench-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/scientific-notation-oscilloscope-signal-bench.webp"
+    },
+    {
+      "id": "challenger-gateboard",
+      "label": "Gate Board & Stub",
+      "verdict": "competitive",
+      "lineage": "departure boards paired with punched ticket stubs",
+      "thesis": "Every expense a punched stub; the month a live board that reranks in place when anything changes.",
+      "palette": ["#10151A", "#F2EFE9", "#0E7C7B", "#E8562A"],
+      "materials": ["split-flap board", "perforated stub stock", "tabular figures"],
+      "viewport": "Fixed-column board ranks spending; each row a stub segment; changed amounts flash ember and hold until seen.",
+      "case": "Strongest pure-clarity fusion — tabular figures and change-hold states map straight onto sync and edits; loses identification to the painted street.",
+      "risk": "Transit neutrality undersells the warmth Egyptians bring to money.",
+      "comp": ".impeccable/mocks/decision/challenger-gateboard.webp",
+      "hero": "https://impeccable.style/worlds/cards/vernacular-ephemera-boarding-pass-and-gate-board-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/vernacular-ephemera-boarding-pass-and-gate-board.webp"
+    },
+    {
+      "id": "challenger-miura",
+      "label": "Miura Fold",
+      "verdict": "declined",
+      "lineage": "deployable Miura-ori solar sheets",
+      "palette": ["#F5F2EC", "#B08D2F", "#8FA6BC"],
+      "materials": ["creased paper", "gold foil"],
+      "case": "Fuses poorly: deployable-sheet drama outruns a glanceable ledger.",
+      "kept": "Scored-seam structural honesty — donated as diagonal section joins.",
+      "hero": "https://impeccable.style/worlds/cards/paper-folds-pleats-deployable-miura-orbit-sheet-hero.webp"
+    },
+    {
+      "id": "challenger-cyclorama",
+      "label": "Cyclorama Dawn",
+      "verdict": "declined",
+      "lineage": "theater lighting cycloramas",
+      "palette": ["#050608", "#1B3C8C", "#C96A6A", "#FFFFFF"],
+      "materials": ["lit cyc wall", "horizon bands"],
+      "case": "Fuses poorly: atmosphere-as-state muddies money truth.",
+      "kept": "Named, labeled light bands instead of raw color signals.",
+      "hero": "https://impeccable.style/worlds/cards/stagecraft-theater-lighting-cyclorama-dawn-hero.webp"
+    },
+    {
+      "id": "challenger-cracktro",
+      "label": "Cracktro Queue",
+      "verdict": "declined",
+      "lineage": "amiga cracktro title screens",
+      "palette": ["#000000", "#F5EFE0", "#FFB000"],
+      "materials": ["bitmap type", "parallax dust"],
+      "case": "Fuses poorly: demo-scene nostalgia means nothing to the street, and a black void is the opposite of the brief.",
+      "kept": "Two-size typographic economy on one shared baseline clock.",
+      "hero": "https://impeccable.style/worlds/cards/operate-c-cracktro-scroller-queue-hero.webp"
+    },
+    {
+      "id": "challenger-plate-section",
+      "label": "Design Annual Plates",
+      "verdict": "declined",
+      "lineage": "a design annual's plate section on uncoated stock",
+      "palette": ["#F5F4F6", "#16181A", "#DCDDF3"],
+      "materials": ["hairline rules", "registration crosses"],
+      "case": "Fuses poorly: near-white restraint is the exact complaint being fixed.",
+      "kept": "Registration furniture — hairlines, crosshairs, tracked caps labels.",
+      "hero": "https://impeccable.style/worlds/cards/design-annual-s-plate-section-hero.webp"
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "buildPath": { "value": "code" },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "What fintech ships everywhere — clean cards, soft shadows, one blue — executed impeccably.",
+    "palette": ["#FFFFFF", "#111827", "#2563EB"],
+    "materials": ["clean cards", "soft elevation"],
+    "viewport": "Balance card up top, transactions list below, chart mid-page — at full craft.",
+    "risk": "Indistinguishable from the competition by design.",
+    "comp": ".impeccable/mocks/decision/canon.webp"
+  },
+  "steer": true
+}

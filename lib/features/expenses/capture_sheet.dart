@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/money/money.dart';
+import '../../core/theme/vault_theme.dart';
 import '../../core/ui/money_input_formatter.dart';
 import '../../data/db/vault_database.dart';
 import '../../data/providers.dart';
@@ -10,6 +11,9 @@ import 'day_grouping.dart';
 
 /// Rising slab (28px crown) holding the capture form. Pass [expense] to edit
 /// an existing row instead: same sheet, prefilled, with a delete action.
+///
+/// Pass [embedded] when the form lives as a full tab (Add expense): saving
+/// then clears the form for the next capture instead of closing the sheet.
 Future<void> showCaptureSheet(
   BuildContext context, {
   ExpenseRow? expense,
@@ -26,9 +30,13 @@ Future<void> showCaptureSheet(
 }
 
 class CaptureSheet extends ConsumerStatefulWidget {
-  const CaptureSheet({this.expense, super.key});
+  const CaptureSheet({this.expense, this.embedded = false, super.key});
 
   final ExpenseRow? expense;
+
+  /// Full-tab mode: after a save the form resets instead of popping, and the
+  /// amount field takes focus immediately.
+  final bool embedded;
 
   @override
   ConsumerState<CaptureSheet> createState() => _CaptureSheetState();
@@ -43,6 +51,7 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
   bool _saving = false;
 
   ExpenseRow? get _editing => widget.expense;
+  bool get _embedded => widget.embedded;
 
   @override
   void initState() {
@@ -111,7 +120,18 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
         );
       }
       if (!mounted) return;
-      Navigator.of(context).pop();
+      if (_embedded && e == null) {
+        // Tab capture: clear for the next expense instead of navigating.
+        _amountController.clear();
+        _noteController.clear();
+        setState(() {
+          _date = DateTime.now();
+          _categoryId = null;
+          _saving = false;
+        });
+      } else {
+        Navigator.of(context).pop();
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(_editing == null
@@ -184,6 +204,7 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _amountController,
+              autofocus: _embedded && _editing == null,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [MoneyInputFormatter()],
@@ -228,6 +249,13 @@ class _CaptureSheetState extends ConsumerState<CaptureSheet> {
             ),
             const SizedBox(height: 24),
             FilledButton(
+              // Ember law: creating an expense is the capture action.
+              style: _editing == null
+                  ? FilledButton.styleFrom(
+                      backgroundColor: VaultColors.ember,
+                      foregroundColor: Colors.white,
+                    )
+                  : null,
               onPressed: _saving ? null : _save,
               child: _saving
                   ? const SizedBox(

@@ -5,6 +5,7 @@ import '../../core/network/api_client.dart';
 String? validateEmail(String? value) {
   final v = value?.trim() ?? '';
   if (v.isEmpty) return 'Enter your email';
+  if (v.length > 254) return 'Email is too long';
   if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v)) {
     return 'Enter a valid email';
   }
@@ -14,6 +15,7 @@ String? validateEmail(String? value) {
 String? validatePassword(String? value) {
   if (value == null || value.isEmpty) return 'Enter your password';
   if (value.length < 8) return 'Use at least 8 characters';
+  if (value.length > 128) return 'Password is too long';
   return null;
 }
 

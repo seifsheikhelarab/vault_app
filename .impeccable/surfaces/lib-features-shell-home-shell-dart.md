@@ -9,10 +9,10 @@ Scope: app shell (four-tab NavigationBar + capture FAB) and auth surfaces (sign-
 
 Audience/job/action: Egyptian consumers tracking EGP spending; open to money-state-at-a-glance, log expenses in seconds, sign in without ceremony.
 
-Direction: Wallet Grammar (roll seed bfe90971, code-led). Committed teal field carries whole regions; off-white slabs carry content; deep ink type. One ember accent (#E8562A) owned by law by the capture action alone — never used elsewhere, never on auth. One typographic mass per viewport (wordmark/balance monumental). Auth composition: teal field head with VAULT wordmark + "Log fast. Works offline.", white slab rising below with fields and one filled primary.
+Direction: Sign-Painter's Cairo (roll seed a5779bdb, code-led; replaces Wallet Grammar bfe90971, user-approved full facelift with colors pinned). Every screen is a freshly painted wall: committed teal field carries whole regions on warm plaster (#F4EFE6) ground, deep ink sets body type, Anton block lettering is the only display voice at exactly two sizes (monumental money mass / yielded titles). Sections join along scored diagonal seams; tracked caps micro-labels are registration furniture. Ember #E8562A remains owned by law by expense capture alone — never charts, navigation, or auth. Navigation is the painted beam: deep-ink strip with plaster destinations and teal indicator pill in light mode. Auth: teal wall head with Anton VAULT wordmark + chalk tagline, plaster slab rising over a scored seam.
 
-Memorable moment: ember FAB as the single hot element in a cool world.
+Memorable moment: the dashboard opening edge-to-edge on the teal painted wall — month total monumental — with the ember FAB the single burning element above the ink beam.
 
-Constraints: Material 3 components only; Roboto platform face acceptable this ticket; dark theme first-class from same seeds; placeholders must name what arrives and when (no fake skeletons); session currently local stub until auth client ticket.
+Constraints: Material 3 components only; dark theme first-class from same seeds (ink-teal night plaster); placeholders name what arrives and when (no fake skeletons); category colors flow through shared categoryTone rotation so swatch/pie/legend agree everywhere.
 
-Unresolved decisions: display typeface upgrade beyond Roboto (open, revisit when bundling fonts); monetization/pricing (PRODUCT.md undecided).
+Unresolved decisions: monetization/pricing (PRODUCT.md undecided).

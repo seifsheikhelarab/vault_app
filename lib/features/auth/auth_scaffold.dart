@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Shared auth composition: committed teal field with the monumental
-/// wordmark, and a rising slab that carries the form. The ember accent never
-/// appears on this surface.
+import '../../core/ui/paint.dart';
+
+/// Shared auth composition: the committed teal painted wall with the
+/// monumental block-letter wordmark, and a plaster slab rising below,
+/// joined by a scored diagonal seam. The ember accent never appears here.
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({required this.child, super.key});
 
@@ -18,7 +20,8 @@ class AuthScaffold extends StatelessWidget {
           Expanded(
             flex: 2,
             child: ColoredBox(
-              color: scheme.primary,
+              // Literal committed field teal in both brightnesses.
+              color: VaultColors.fieldSeed,
               child: SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
@@ -28,24 +31,21 @@ class AuthScaffold extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           'Vault',
-                          style: Theme.of(context)
-                              .textTheme
-                              .displayLarge
-                              ?.copyWith(
-                                color: scheme.onPrimary,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -1,
-                              ),
+                          style: TextStyle(
+                            fontFamily: vaultDisplayFamily,
+                            fontSize: 64,
+                            height: 1.0,
+                            letterSpacing: 1.5,
+                            color: Colors.white,
+                          ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
                         Text(
-                          'Log fast. Works offline.',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(color: scheme.onPrimary),
+                          'LOG FAST. WORKS OFFLINE.',
+                          style: chalkLabel(
+                              Colors.white.withValues(alpha: 0.85)),
                         ),
                       ],
                     ),
@@ -56,26 +56,14 @@ class AuthScaffold extends StatelessWidget {
           ),
           Expanded(
             flex: 3,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: scheme.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(28),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    offset: const Offset(0, -6),
-                    blurRadius: 18,
-                    color: scheme.scrim.withValues(alpha: 0.35),
-                  ),
-                ],
-              ),
+            child: ScoredPanel(
+              color: scheme.surface,
+              seamColor: scheme.primary.withValues(alpha: 0.35),
+              slope: 16,
+              padding: const EdgeInsets.fromLTRB(24, 36, 24, 24),
               child: SafeArea(
                 top: false,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-                  child: child,
-                ),
+                child: SingleChildScrollView(child: child),
               ),
             ),
           ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/money/money.dart';
 import '../../core/ui/empty_state.dart';
+import '../../core/ui/paint.dart';
 import '../../data/db/vault_database.dart';
 import '../../data/providers.dart';
 import '../../data/sync/sync_providers.dart';
@@ -80,10 +81,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                 Expanded(
                   child: Text(
                     'Expenses',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
                 ),
                 IconButton(
@@ -154,7 +152,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         onNotification: _onScrollNotification,
         child: ListView.builder(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(top: 4, bottom: 96),
+          padding: const EdgeInsets.only(top: 4, bottom: 160),
           itemCount: groups.length,
           itemBuilder: (_, index) => _DaySection(
             group: groups[index],
@@ -216,17 +214,11 @@ class _DaySection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 4),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 6),
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  formatDayHeader(group.day),
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelLarge
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
+                child: RegistrationLabel(formatDayHeader(group.day)),
               ),
               Text(
                 formatEgp(group.totalMinor),
@@ -264,6 +256,13 @@ class _ExpenseTile extends StatelessWidget {
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      leading: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: CategorySwatch(
+          categoryId: row.categoryId,
+          size: 14,
+        ),
+      ),
       onTap: () => showCaptureSheet(context, expense: row),
       title: Row(
         children: [

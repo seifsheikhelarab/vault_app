@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:drift/drift.dart';
 
@@ -23,6 +24,20 @@ import '../db/vault_database.dart';
 ///
 /// Transient failures (429/5xx/network) back off exponentially; permanent
 /// failures abort the cycle silently — nothing here ever surfaces UI.
+/// The outcome (rows still owed to the server, whether the last cycle
+/// failed) is reported through [SyncEngine.onStatus].
+
+/// Outcome of the most recent sync cycle, for quiet UI indicators.
+class SyncStatus {
+  const SyncStatus({required this.pendingCount, required this.lastCycleFailed});
+
+  /// Rows still owed to the server (dirty expenses + categories).
+  final int pendingCount;
+
+  /// Whether the most recent cycle aborted early.
+  final bool lastCycleFailed;
+}
+
 class SyncEngine {
   SyncEngine(this._db, this._api);
 
@@ -30,6 +45,7 @@ class SyncEngine {
   final ApiClient _api;
 
   static const _pullPageSize = 50;
+  static const _maxPullPages = 200;
   static const _pushChunkSize = 500;
   static const _maxAttempts = 4;
   static const _backoffBase = Duration(milliseconds: 800);
@@ -37,6 +53,10 @@ class SyncEngine {
 
   bool _running = false;
   bool _queued = false;
+
+  /// Set after each cycle so the app can surface "not synced" without
+  /// dialogs. Nullable callback mirrors the repositories' `onMutated` style.
+  void Function(SyncStatus status)? onStatus;
 
   /// Runs one full cycle. Reentrant calls while a cycle is in flight are
   /// coalesced into exactly one follow-up run, so trigger storms collapse.
@@ -46,18 +66,42 @@ class SyncEngine {
       return;
     }
     _running = true;
+    var failed = false;
     try {
       await _cycle();
     } catch (_) {
       // Silent by design — conflicts and dead networks must never surface
       // dialogs; the next trigger retries.
+      failed = true;
     } finally {
       _running = false;
+      unawaited(_reportStatus(failed));
     }
     if (_queued) {
       _queued = false;
       await runCycle();
     }
+  }
+
+  /// Best-effort status emission after each cycle.
+  Future<void> _reportStatus(bool failed) async {
+    final onStatus = this.onStatus;
+    if (onStatus == null) return;
+    try {
+      onStatus(SyncStatus(
+        pendingCount: await pendingCount(),
+        lastCycleFailed: failed,
+      ));
+    } catch (_) {}
+  }
+
+  /// Rows still owed to the server (dirty expenses + categories).
+  Future<int> pendingCount() async {
+    final cats =
+        await (_db.select(_db.categories)..where((c) => c.pendingSync)).get();
+    final exps =
+        await (_db.select(_db.expenses)..where((e) => e.pendingSync)).get();
+    return cats.length + exps.length;
   }
 
   /// Clears the pull cursor so the next cycle re-pulls full history.
@@ -79,6 +123,14 @@ class SyncEngine {
         .go();
     if (wipeLocalData) {
       await _db.transaction(() async {
+        // Null category references on the online-only caches first — with
+        // `PRAGMA foreign_keys = ON` the category delete would otherwise
+        // throw and abort the whole recovery wipe.
+        await (_db.update(_db.budgets)..where((b) => b.categoryId.isNotNull()))
+            .write(const BudgetsCompanion(categoryId: Value(null)));
+        await (_db.update(_db.recurrings)
+              ..where((r) => r.categoryId.isNotNull()))
+            .write(const RecurringsCompanion(categoryId: Value(null)));
         await _db.expenses.delete().go();
         await _db.categories.delete().go();
       });
@@ -105,12 +157,20 @@ class SyncEngine {
       final catChunk =
           dirtyCategories.skip(i).take(_pushChunkSize).toList();
       final expChunk = dirtyExpenses.skip(i).take(_pushChunkSize).toList();
-      final results = await _withBackoff(
-        () => _api.pushSync(
-          categories: [for (final c in catChunk) _categoryPayload(c)],
-          expenses: [for (final e in expChunk) _expensePayload(e)],
-        ),
-      );
+      final List<SyncPushResult> results;
+      try {
+        results = await _withBackoff(
+          () => _api.pushSync(
+            categories: [for (final c in catChunk) _categoryPayload(c)],
+            expenses: [for (final e in expChunk) _expensePayload(e)],
+          ),
+        );
+      } catch (_) {
+        // ponytail: chunk-level fail-soft — one poison/offline chunk leaves
+        // its flags set for the next cycle instead of starving later chunks.
+        // Per-row quarantine if poison rows ever show up in practice.
+        continue;
+      }
       // `conflict-lost` still means the server holds the authoritative row,
       // so both outcomes clear the flag.
       final settled = results.map((r) => r.id).toSet();
@@ -120,27 +180,45 @@ class SyncEngine {
       await _db.transaction(() async {
         for (final c in catChunk) {
           if (!settled.contains(c.id)) continue;
-          if (c.deletedAt != null) {
-            await _purgeCategory(c.id);
+          // Settle only what is still exactly what we pushed: an edit or
+          // delete staged mid-flight re-dirtied the row with a newer
+          // updatedAt, and must survive for the next cycle.
+          final current = await (_db.select(_db.categories)
+                ..where((row) =>
+                    row.id.equals(c.id) &
+                    row.pendingSync.equals(true) &
+                    row.updatedAt.equals(c.updatedAt)))
+              .getSingleOrNull();
+          if (current == null) continue;
+          if (current.deletedAt != null) {
+            await _purgeCategory(current.id);
           } else {
             await (_db.update(_db.categories)
-                  ..where((row) => row.id.equals(c.id)))
+                  ..where((row) => row.id.equals(current.id)))
                 .write(const CategoriesCompanion(pendingSync: Value(false)));
           }
         }
         for (final e in expChunk) {
           if (!settled.contains(e.id)) continue;
-          if (e.deletedAt != null) {
-            await (_db.delete(_db.expenses)..where((row) => row.id.equals(e.id)))
+          final current = await (_db.select(_db.expenses)
+                ..where((row) =>
+                    row.id.equals(e.id) &
+                    row.pendingSync.equals(true) &
+                    row.updatedAt.equals(e.updatedAt)))
+              .getSingleOrNull();
+          if (current == null) continue;
+          if (current.deletedAt != null) {
+            await (_db.delete(_db.expenses)
+                  ..where((row) => row.id.equals(current.id)))
                 .go();
           } else {
             await (_db.update(_db.expenses)
-                  ..where((row) => row.id.equals(e.id)))
+                  ..where((row) => row.id.equals(current.id)))
                 .write(const ExpensesCompanion(pendingSync: Value(false)));
           }
         }
       });
-      if (anyConflictLost && i == 0) {
+      if (anyConflictLost) {
         // The server rejected some pushed rows in favor of its own versions,
         // but the pull cursor has already advanced past those writes. Reset
         // the cursor so the next drain refetches the winning state;
@@ -171,6 +249,7 @@ class SyncEngine {
 
   Future<void> _drainPull() async {
     var cursor = await _readCursor();
+    var pages = 0;
     while (true) {
       final page = await _withBackoff(
         () => _api.pullSync(limit: _pullPageSize, cursor: cursor),
@@ -187,6 +266,9 @@ class SyncEngine {
       });
       if (nextCursor == null) break;
       cursor = nextCursor;
+      // Guard against a buggy server that never terminates the cursor; the
+      // persisted cursor lets the next cycle resume cleanly.
+      if (++pages >= _maxPullPages) break;
     }
   }
 
@@ -259,11 +341,13 @@ class SyncEngine {
   Future<void> _reconcileCategories() async {
     final server = await _withBackoff(_api.listCategories);
     final serverIds = {for (final c in server) c['id'] as String};
-    // Dirty rows were flushed by _pushDirty (or aborted the cycle), so any
-    // clean local row absent from the server was deleted elsewhere.
-    final locals =
-        await (_db.select(_db.categories)..where((c) => c.deletedAt.isNull()))
-            .get();
+    // Skip dirty rows: a category created while the push→pull network round
+    // trips were in flight is absent from this stale server snapshot and
+    // would be purged before ever syncing. Clean rows absent from the
+    // server were deleted elsewhere.
+    final locals = await (_db.select(_db.categories)
+          ..where((c) => c.deletedAt.isNull() & c.pendingSync.equals(false)))
+        .get();
     for (final row in locals) {
       if (!serverIds.contains(row.id)) await _purgeCategory(row.id);
     }
@@ -282,9 +366,11 @@ class SyncEngine {
   // ── Shared helpers ────────────────────────────────────────────────────
 
   /// Retries transient failures (429/5xx/network/timeout) with exponential
-  /// backoff; anything else rethrows immediately to abort the cycle.
+  /// backoff plus ±25% jitter; anything else rethrows immediately to abort
+  /// the cycle.
   Future<T> _withBackoff<T>(Future<T> Function() op) async {
     var delay = _backoffBase;
+    final random = Random();
     for (var attempt = 1;; attempt++) {
       try {
         return await op();
@@ -293,7 +379,12 @@ class SyncEngine {
             error is! ApiException || error.statusCode == 429 ||
                 error.statusCode >= 500;
         if (!transient || attempt >= _maxAttempts) rethrow;
-        await Future<void>.delayed(delay);
+        // ponytail: no consecutive-failure cooldown — jitter only. Add a
+        // cooldown keyed on connectivity edges if flapping radios ever
+        // burn real battery/server budget.
+        final waitMs =
+            delay.inMilliseconds * (1 + (random.nextDouble() - 0.5) * 0.5);
+        await Future<void>.delayed(Duration(milliseconds: waitMs.round()));
         delay *= 2;
       }
     }

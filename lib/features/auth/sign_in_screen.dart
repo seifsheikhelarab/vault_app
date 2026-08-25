@@ -55,6 +55,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen>
               controller: _password,
               decoration: const InputDecoration(labelText: 'Password'),
               obscureText: true,
+              maxLength: 128,
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => _submit(),
               validator: validatePassword,

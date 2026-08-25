@@ -1,6 +1,13 @@
 ---
 name: Vault
 description: Offline-first expense tracker for Egyptian consumers — log fast, works offline.
+
+> **Superseded in code.** The shipped visual world is **Sign-Painter's Cairo**
+> (roll seed a5779bdb) — see the design contract atop `lib/core/theme/vault_theme.dart`
+> and `.impeccable/surfaces/lib-features-shell-home-shell-dart.md`. This document
+> still describes the retired "Wallet Grammar" world; its Ember Law, Committed
+> Field Rule, and Material-3 basis carry over unchanged.
+
 colors:
   field-teal: "#0E7C7B"
   ember: "#E8562A"
@@ -88,7 +95,7 @@ A deep teal field anchors identity; every other surface is a Material-derived ne
 
 ## Layout
 
-Single-column phone-first layout. Auth splits the viewport 2:3 — committed field above, rising form slab below. Content slabs use 24px horizontal padding; forms separate fields by 16px and fields-from-action by 24px. Empty states center horizontally with 32px side insets and 16/8px internal rhythm. Bottom navigation carries the four destinations (Home, Expenses, Chat, Settings).
+Single-column phone-first layout. Auth splits the viewport 2:3 — committed field above, rising form slab below. Content slabs use 24px horizontal padding; forms separate fields by 16px and fields-from-action by 24px. Empty states center horizontally with 32px side insets and 16/8px internal rhythm. Bottom navigation carries the four destinations (Add expense, Reports, Expenses, Settings).
 
 ## Elevation & Depth
 
