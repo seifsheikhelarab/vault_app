@@ -51,50 +51,10 @@ class _CategoriesSheetState extends ConsumerState<CategoriesSheet> {
   }
 
   Future<void> _rename(CategoryRow category) async {
-    final controller = TextEditingController(text: category.name);
-    final error = ValueNotifier<String?>(null);
     final renamed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Rename category'),
-        content: ValueListenableBuilder<String?>(
-          valueListenable: error,
-          builder: (_, value, _) => TextFormField(
-            controller: controller,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: 'Name',
-              errorText: value,
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              try {
-                final repo =
-                    await ref.read(categoriesRepositoryProvider.future);
-                await repo.rename(category.id, controller.text);
-                if (dialogContext.mounted) {
-                  Navigator.of(dialogContext).pop(true);
-                }
-              } on FormatException catch (e) {
-                error.value = e.message;
-              } on DuplicateCategoryException {
-                error.value = 'A category with this name already exists.';
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+      builder: (_) => _RenameDialog(category: category),
     );
-    controller.dispose();
-    error.dispose();
     if ((renamed ?? false) && mounted) Navigator.of(context).pop();
   }
 
@@ -182,8 +142,7 @@ class _CategoriesSheetState extends ConsumerState<CategoriesSheet> {
       ),
     );
   }
-  Widget _buildList() {
-    final categoriesAsync = ref.watch(categoriesListProvider);
+  Widget _buildList() {    final categoriesAsync = ref.watch(categoriesListProvider);
     if (categoriesAsync.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -227,6 +186,82 @@ class _CategoriesSheetState extends ConsumerState<CategoriesSheet> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Owns its controller so the framework disposes it only after the dialog
+/// route is fully torn down — disposing on pop-start crashed the exit
+/// animation (controller used after dispose).
+class _RenameDialog extends ConsumerStatefulWidget {
+  const _RenameDialog({required this.category});
+
+  final CategoryRow category;
+
+  @override
+  ConsumerState<_RenameDialog> createState() => _RenameDialogState();
+}
+
+class _RenameDialogState extends ConsumerState<_RenameDialog> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.category.name);
+  String? _error;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() {
+      _error = null;
+      _saving = true;
+    });
+    try {
+      final repo = await ref.read(categoriesRepositoryProvider.future);
+      await repo.rename(widget.category.id, _controller.text);
+      if (mounted) Navigator.of(context).pop(true);
+    } on FormatException catch (e) {
+      setState(() {
+        _error = e.message;
+        _saving = false;
+      });
+    } on DuplicateCategoryException {
+      setState(() {
+        _error = 'A category with this name already exists.';
+        _saving = false;
+      });
+    } catch (_) {
+      setState(() => _saving = false);
+      rethrow;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Rename category'),
+      content: TextFormField(
+        controller: _controller,
+        autofocus: true,
+        decoration: InputDecoration(
+          labelText: 'Name',
+          errorText: _error,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: _saving ? null : _save,
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

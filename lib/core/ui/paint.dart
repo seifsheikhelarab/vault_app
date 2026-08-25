@@ -26,6 +26,10 @@ class RegistrationLabel extends StatelessWidget {
 /// A flat painted panel whose top edge is cut on a slight diagonal, with a
 /// lighter seam line scored along the join — sections of one wall meeting,
 /// not stacked cards.
+///
+/// Optional [fillFraction] (0..1) washes a translucent band in from the
+/// left edge, clipped to the same diagonal — the panel itself becomes the
+/// bar (e.g. month spend against an overall budget cap).
 class ScoredPanel extends StatelessWidget {
   const ScoredPanel({
     required this.child,
@@ -33,6 +37,8 @@ class ScoredPanel extends StatelessWidget {
     this.seamColor,
     this.slope = 14,
     this.padding = const EdgeInsets.all(20),
+    this.fillFraction,
+    this.fillColor,
     super.key,
   });
 
@@ -49,6 +55,12 @@ class ScoredPanel extends StatelessWidget {
 
   final EdgeInsets padding;
 
+  /// Left-to-right fill width as a fraction of the panel; null = no fill.
+  final double? fillFraction;
+
+  /// Fill wash color; defaults to a translucent white over the ground.
+  final Color? fillColor;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -59,12 +71,25 @@ class ScoredPanel extends StatelessWidget {
       foregroundPainter: _SeamPainter(slope: slope, seam: seam),
       child: ClipPath(
         clipper: _DiagonalClipper(slope),
-        child: ColoredBox(
-          color: fill,
-          child: Padding(
-            padding: pad,
-            child: child,
-          ),
+        child: Stack(
+          children: [
+            Positioned.fill(child: ColoredBox(color: fill)),
+            if (fillFraction != null)
+              Positioned.fill(
+                child: FractionallySizedBox(
+                  widthFactor: fillFraction!.clamp(0.0, 1.0),
+                  alignment: Alignment.centerLeft,
+                  child: ColoredBox(
+                    color:
+                        fillColor ?? Colors.white.withValues(alpha: 0.13),
+                  ),
+                ),
+              ),
+            Padding(
+              padding: pad,
+              child: child,
+            ),
+          ],
         ),
       ),
     );

@@ -72,11 +72,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // Recurring rules mirror budgets: online-only CRUD, full-screen push.
+      // Recurring payments mirror budgets: online-only CRUD, full-screen
+      // push. '/recurring/new' may carry a RecurringSeed from the capture
+      // form (extra).
       GoRoute(
         path: '/recurring',
         builder: (_, _) => const RecurringScreen(),
         routes: [
+          GoRoute(
+            path: 'new',
+            builder: (_, state) => RecurringEditorScreen(
+              ruleId: 'new',
+              seed: state.extra is RecurringSeed
+                  ? state.extra as RecurringSeed
+                  : null,
+            ),
+          ),
           GoRoute(
             path: ':id',
             builder: (_, state) =>

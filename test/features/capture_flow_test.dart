@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vault_app/data/db/vault_database.dart';
 import 'package:vault_app/data/providers.dart';
 import 'package:vault_app/data/repositories/categories_repository.dart';
-import 'package:vault_app/features/expenses/capture_fab.dart';
+import 'package:vault_app/features/expenses/capture_sheet.dart';
 
 /// Unmounts while still inside the test's fake-async zone, then pumps once
 /// so drift's internal stream-cleanup timers fire before the framework's
@@ -17,14 +17,14 @@ Future<void> _unmount(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 1));
 }
 
+/// The capture form as the Add-expense tab hosts it (embedded mode).
 Future<void> _pumpHarness(WidgetTester tester, VaultDatabase db) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [vaultDatabaseProvider.overrideWithValue(AsyncValue.data(db))],
       child: const MaterialApp(
         home: Scaffold(
-          body: SizedBox.shrink(),
-          floatingActionButton: CaptureFab(),
+          body: SafeArea(child: CaptureSheet(embedded: true)),
         ),
       ),
     ),
@@ -32,7 +32,7 @@ Future<void> _pumpHarness(WidgetTester tester, VaultDatabase db) async {
   await tester.pumpAndSettle();
 }
 
-Finder get _amountField => find.widgetWithText(TextFormField, 'Amount').first;
+Finder get _amountField => find.byType(TextField).first;
 
 void main() {
   late VaultDatabase db;
@@ -41,36 +41,32 @@ void main() {
   tearDown(() => db.close());
 
   group('capture flow', () {
-    testWidgets('ember FAB opens the log-an-expense sheet', (tester) async {
+    testWidgets('embedded form renders ready to capture', (tester) async {
       await _pumpHarness(tester, db);
 
-      expect(find.text('Log an expense'), findsNothing);
-      await tester.tap(find.byType(FloatingActionButton));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Log an expense'), findsOneWidget);
+      expect(find.text('EGP'), findsOneWidget);
       expect(_amountField, findsOneWidget);
       expect(find.text('Uncategorized'), findsOneWidget);
       expect(
           find.widgetWithText(FilledButton, 'Save expense'), findsOneWidget);
+      // The carry-over path to recurring rules sits one tap away.
+      expect(find.text('Make it a recurring payment'), findsOneWidget);
       await _unmount(tester);
     });
 
     testWidgets('decimal keypad rejects a third decimal place',
         (tester) async {
       await _pumpHarness(tester, db);
-      await tester.tap(find.byType(FloatingActionButton));
-      await tester.pumpAndSettle();
 
       await tester.enterText(_amountField, '12.345');
-      expect(tester.widget<TextFormField>(_amountField).controller!.text, '');
+      expect(tester.widget<TextField>(_amountField).controller!.text, '');
 
       await tester.enterText(_amountField, '12.34');
-      expect(tester.widget<TextFormField>(_amountField).controller!.text,
+      expect(tester.widget<TextField>(_amountField).controller!.text,
           '12.34');
 
       await tester.enterText(_amountField, '1.2.3');
-      expect(tester.widget<TextFormField>(_amountField).controller!.text,
+      expect(tester.widget<TextField>(_amountField).controller!.text,
           '12.34');
       await _unmount(tester);
     });
@@ -78,8 +74,6 @@ void main() {
     testWidgets('empty amount shows inline error and writes nothing',
         (tester) async {
       await _pumpHarness(tester, db);
-      await tester.tap(find.byType(FloatingActionButton));
-      await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(FilledButton, 'Save expense'));
       await tester.pump();
@@ -93,9 +87,6 @@ void main() {
         (tester) async {
       final food = await CategoriesRepository(db).create('Food');
       await _pumpHarness(tester, db);
-
-      await tester.tap(find.byType(FloatingActionButton));
-      await tester.pumpAndSettle();
 
       await tester.enterText(_amountField, '49.99');
       await tester.tap(find.text('Food'));
@@ -120,16 +111,15 @@ void main() {
         matches(RegExp(r'^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$')),
       );
 
-      // Sheet closed, gentle status shown.
-      expect(find.text('Log an expense'), findsNothing);
+      // Embedded mode: form cleared for the next capture, status shown.
+      expect(
+          tester.widget<TextField>(_amountField).controller!.text, '');
       expect(find.textContaining('sync when online'), findsOneWidget);
       await _unmount(tester);
     });
 
     testWidgets('capture works without any categories yet', (tester) async {
       await _pumpHarness(tester, db);
-      await tester.tap(find.byType(FloatingActionButton));
-      await tester.pumpAndSettle();
 
       await tester.enterText(_amountField, '20');
       await tester

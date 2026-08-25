@@ -3,10 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/sync/sync_status_banner.dart';
-import '../expenses/capture_fab.dart';
 
-/// Four-destination shell. The ember FAB is the capture action — the only
-/// element in the world allowed to burn hot.
+/// Four-destination shell. Capture is the first tab — the app opens with
+/// the log-an-expense form, so there is nothing left for a FAB to do.
 class HomeShell extends ConsumerWidget {
   const HomeShell({required this.shell, super.key});
 
@@ -21,10 +20,6 @@ class HomeShell extends ConsumerWidget {
           Expanded(child: shell),
         ],
       ),
-      // The capture tab IS the log-an-expense form — the FAB would be a
-      // duplicate, so it only burns on the other three tabs.
-      floatingActionButton:
-          shell.currentIndex == 0 ? null : const CaptureFab(),
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (index) =>

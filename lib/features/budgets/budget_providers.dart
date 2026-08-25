@@ -1,13 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/connectivity_provider.dart';
 import '../../data/db/vault_database.dart';
 import '../../data/providers.dart';
 
-/// Cached budget rows, streamed from the local table.
+/// Cached budget rows, streamed from the local table. The cache only fills
+/// via [BudgetsRepository.refresh], so watching kicks a background refresh
+/// (online only; failure leaves the stale cache untouched). Without this the
+/// section stays empty until the user pull-to-refreshes the budgets screen.
 final budgetsListProvider = StreamProvider.autoDispose<List<BudgetRow>>((ref) {
   final repo = ref.watch(budgetsRepositoryProvider).value;
   if (repo == null) return const Stream<Never>.empty();
+  ref.watch(isOnlineProvider);
+  if (ref.read(isOnlineProvider)) {
+    unawaited(repo.refresh().catchError((_) {}));
+  }
   return repo.watchAll();
 });
 

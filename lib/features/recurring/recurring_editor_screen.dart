@@ -12,13 +12,27 @@ import '../../data/repositories/recurring_repository.dart';
 import '../expenses/day_grouping.dart';
 import 'recurring_providers.dart';
 
+/// Values carried over from the capture form when the user chooses to turn
+/// a typed expense into a recurring rule instead.
+class RecurringSeed {
+  const RecurringSeed({this.amountMinor, this.categoryId});
+
+  final int? amountMinor;
+  final String? categoryId;
+}
+
 /// Create/edit a single recurring rule. `ruleId == 'new'` is create mode.
 /// Everything except reading the form is gated on connectivity: rules are
 /// not synced offline, so saves/deletes refuse outright with a reason.
 class RecurringEditorScreen extends ConsumerStatefulWidget {
-  const RecurringEditorScreen({required this.ruleId, super.key});
+  const RecurringEditorScreen({
+    required this.ruleId,
+    this.seed,
+    super.key,
+  });
 
   final String ruleId;
+  final RecurringSeed? seed;
 
   @override
   ConsumerState<RecurringEditorScreen> createState() =>
@@ -58,16 +72,23 @@ class _RecurringEditorScreenState extends ConsumerState<RecurringEditorScreen> {
       if (r.id == widget.ruleId) existing = r;
     }
 
-    // Seed once when editing and the cached row arrives.
-    if (!_isNew && !_seeded && existing != null) {
-      _seeded = true;
-      _nameCtrl.text = existing.name;
-      _amountCtrl.text = formatPiasters(existing.amountMinor);
-      _intervalCtrl.text = '${existing.interval}';
-      _categoryId = existing.categoryId;
-      _frequency = existing.frequency;
-      _anchorDate = existing.anchorDate;
-      _paused = existing.paused;
+    // Seed once: an existing rule's values, or the capture form's carry-over.
+    if (!_seeded) {
+      if (!_isNew && existing != null) {
+        _seeded = true;
+        _nameCtrl.text = existing.name;
+        _amountCtrl.text = formatPiasters(existing.amountMinor);
+        _intervalCtrl.text = '${existing.interval}';
+        _categoryId = existing.categoryId;
+        _frequency = existing.frequency;
+        _anchorDate = existing.anchorDate;
+        _paused = existing.paused;
+      } else if (_isNew && widget.seed != null) {
+        _seeded = true;
+        final seedAmount = widget.seed!.amountMinor;
+        if (seedAmount != null) _amountCtrl.text = formatPiasters(seedAmount);
+        _categoryId = widget.seed!.categoryId;
+      }
     }
 
     return Scaffold(

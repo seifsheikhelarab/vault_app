@@ -111,6 +111,12 @@ class _DashboardContent extends ConsumerWidget {
     final categories = ref.watch(categoriesListProvider).value ?? const [];
     final names = {for (final c in categories) c.id: c.name};
     final recurrings = ref.watch(recurringListProvider).value;
+    // The month wall is the bar for the overall monthly cap: the angled
+    // field fills bottom-up with the share of the budget spent.
+    final overall = progress
+        .where((p) =>
+            p.budget.categoryId == null && p.budget.periodType == 'month')
+        .firstOrNull;
     return ListView(
       padding: const EdgeInsets.fromLTRB(0, 0, 0, 160),
       children: [
@@ -120,6 +126,7 @@ class _DashboardContent extends ConsumerWidget {
         ScoredPanel(
           color: VaultColors.fieldSeed,
           slope: 16,
+          fillFraction: overall?.ratio,
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,11 +140,19 @@ class _DashboardContent extends ConsumerWidget {
                 color: Colors.white,
               ),
               const SizedBox(height: 6),
-              _DeltaLabel(
-                current: data.monthTotals.current,
-                previous: data.monthTotals.previous,
-                color: Colors.white.withValues(alpha: 0.8),
-              ),
+              if (overall != null)
+                Text(
+                  overall.over
+                      ? '${(overall.spent / overall.limitMinor * 100).round()}% of budget — over by ${formatEgp(overall.spent - overall.limitMinor)}'
+                      : '${(overall.spent / overall.limitMinor * 100).round()}% of budget',
+                  style: chalkLabel(Colors.white.withValues(alpha: 0.85)),
+                )
+              else
+                _DeltaLabel(
+                  current: data.monthTotals.current,
+                  previous: data.monthTotals.previous,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
             ],
           ),
         ),
@@ -174,17 +189,28 @@ class _DashboardContent extends ConsumerWidget {
               // Reports live on the dashboard: breakdown and trend inline.
               ReportsPanel(scrollable: false),
               const SizedBox(height: 20),
-              if (progress.isNotEmpty) ...[
-                Row(
-                  children: [
-                    Expanded(child: RegistrationLabel('Budgets')),
-                    TextButton(
-                      onPressed: () => context.push('/budgets'),
-                      child: const Text('Manage'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
+              // Budgets header stays visible when empty so the Manage entry
+              // point never disappears (same law as recurring below).
+              Row(
+                children: [
+                  Expanded(child: RegistrationLabel('Budgets')),
+                  TextButton(
+                    onPressed: () => context.push('/budgets'),
+                    child: const Text('Manage'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              if (progress.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Text(
+                    'No budgets yet.',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                )
+              else
                 for (final p in progress)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 14),
@@ -232,7 +258,6 @@ class _DashboardContent extends ConsumerWidget {
                     ),
                   ),
                 const SizedBox(height: 8),
-              ],
               // Committed future spend: recurring rules glanceable beside the
               // budgets they feed. Section stays visible when empty so the
               // entry point never disappears.

@@ -13,11 +13,13 @@ import 'package:flutter/material.dart';
 // furniture; ember #E8562A decorates only expense capture, never charts,
 // navigation, or auth.
 // STORY: opens straight onto their month painted in full color; logging is
-// the one burning action; nothing nags.
+// the one burning action — ember lives on the capture surface itself, the
+// first tab; nothing nags.
 // FIRST VIEWPORT: dashboard opens edge-to-edge on the teal painted wall,
 // month total monumental in Anton, delta beneath in tinted plaster text;
-// below the seam, week band, budget patches, recent strips; ember FAB alone
-// burns above an ink navigation beam.
+// below the seam, week band, budget patches, recurring strips, recent
+// strips; capture owns the first tab, ember its save action, over an ink
+// navigation beam.
 // FORM: roll-assigned candidate 7 of 7 grounded directions (hand-painted
 // shop signs & cinema billboards of Cairo streets). Raises named from
 // Design Annual Plates (registration label furniture), Miura Fold (scored

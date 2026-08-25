@@ -156,8 +156,9 @@ void main() {
       (tester) async {
     await signIn(tester);
 
-    // Capture is the first tab: the form is up immediately, no FAB needed.
-    expect(find.text('Log an expense'), findsOneWidget);
+    // Capture is the first tab: the monumental amount field is up
+    // immediately, no FAB needed.
+    expect(find.text('EGP'), findsOneWidget);
     expect(find.byType(NavigationBar), findsOneWidget);
     for (final label in ['Add expense', 'Reports', 'Expenses', 'Settings']) {
       expect(navLabel(label), findsOneWidget);
@@ -191,15 +192,13 @@ void main() {
       (tester) async {
     await signIn(tester); // MockClient 404s every non-auth route.
 
-    await tester.enterText(
-        find.widgetWithText(TextFormField, 'Amount'), '42');
+    await tester.enterText(find.byType(TextField).first, '42');
     await tester.tap(find.widgetWithText(FilledButton, 'Save expense'));
     await tester.pumpAndSettle();
 
     // Form cleared, ready for the next capture.
-    final amount = find.widgetWithText(TextFormField, 'Amount');
-    expect(amount, findsOneWidget);
-    expect(tester.widget<TextFormField>(amount).controller!.text, isEmpty);
+    final amount = find.byType(TextField).first;
+    expect(tester.widget<TextField>(amount).controller!.text, isEmpty);
 
     // The expense exists locally despite zero successful network writes.
     await tester.tap(navLabel('Expenses'));
@@ -223,19 +222,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(FilledButton, 'Sign in'), findsOneWidget);
-    await unmount(tester);
-  });
-
-  testWidgets('capture FAB opens the log-an-expense sheet', (tester) async {
-    await signIn(tester);
-
-    // The FAB rests on every tab except capture itself.
-    await tester.tap(navLabel('Reports'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byType(FloatingActionButton));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Log an expense'), findsOneWidget);
     await unmount(tester);
   });
 
